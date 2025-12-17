@@ -2,6 +2,8 @@ import sqlite3
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, callback
+from dash import callback_context
+
 
 # connect db and get data
 conn = sqlite3.connect('Tea_Shop_Database.db')
@@ -49,6 +51,7 @@ conn.close()
 COLOR_LIGHT_BROWN = '#EBDEC1'
 COLOR_DARK_BROWN = '#5C4033'
 COLOR_WHITE = '#FFFFFF'
+COLOR_BLACK = '#000000'
 BORDER = False
 def pic(name):
     return html.Img(src = f'/assets/{name}.png',
@@ -56,10 +59,16 @@ def pic(name):
                     style = {'width': '70%', 'marginBottom': '2vw'})
 
 def to_pic(drink):
-    print(drink)
+    # print(drink)
     file = drink.split(' (')[0].replace("'", '').replace(' ', '_').lower()
-    print(file)
+    # print(file)
     return f'/assets/{file}.png'
+
+def find_tp(drink):
+    for item in tp_list:
+        if item in drink:
+            return item
+    return 'NULL'
 
 def block_style(mode):
     # if mode == 'full':
@@ -76,6 +85,13 @@ def word_style(size, alignment):
             'fontSize': f'{size}vw',
             'fontWeight': 'normal',  # bold, normal, 100~900
             'textAlign': alignment}
+
+def dd_style():
+    return {'color': COLOR_BLACK,
+            'fontFamily': 'Arial, sans-serif',
+            'fontSize': '1vw',
+            'fontWeight': 'normal',  # bold, normal, 100~900
+            'textAlign': 'left'}
 
 def put_vertical(alignment):
     return {'display': 'flex', 'flexDirection': 'column', 'alignItems': alignment}
@@ -149,21 +165,24 @@ for drink in drink_list:
 drink_info_no_sugar['drink_caff'] = caff_list
 
 # get all drink_combination
+all_drink_list_full = []
 all_drink_list = []
 all_base_list = []
 all_price_list = []
 all_cal_list = []
 all_caff_list = []
 for idx, row in df_sw.iterrows():
-    all_drink_list.append(f"{row['drink_name']} ({row['sw_name']})")
+    all_drink_list_full.append(f"{row['drink_name']} ({row['sw_name']})")
     cor_row = drink_info_no_sugar.loc[drink_info_no_sugar['drink_name'] == row['drink_name'],
-                                      ['drink_base', 'drink_price', 'drink_cal', 'drink_caff']].iloc[0]
+                                      ['drink_name', 'drink_base', 'drink_price', 'drink_cal', 'drink_caff']].iloc[0]
+    all_drink_list.append(cor_row['drink_name'])
     all_base_list.append(cor_row['drink_base'])
     all_price_list.append(cor_row['drink_price'])
     all_cal_list.append(cor_row['drink_cal'] + row['sw_cal'])
     all_caff_list.append(cor_row['drink_caff'])
 
-drink_info = pd.DataFrame({'drink_name': all_drink_list,
+drink_info = pd.DataFrame({'drink_full_name': all_drink_list_full,
+                           'drink_name': all_drink_list,
                            'drink_base': all_base_list,
                            'drink_price': all_price_list,
                            'drink_cal': all_cal_list,
@@ -179,18 +198,20 @@ sw_dd = dcc.Dropdown(
                 {'label': 'No Sugar (0%)', 'value': 'No Sugar'}
             ],
             value = 'Select a sweetness',
-            style = {**word_style('1', 'left'), 'marginBottom': '1vw'}
+            style = {**dd_style(), 'marginBottom': '1vw'}
         )
 base_dd = dcc.Dropdown(id = 'base_dd', options = base_list, 
-                       value = 'Select a base', style = {**word_style('1', 'left'), 'marginBottom': '1vw'})
+                       value = 'Select a base', style = {**dd_style(), 'marginBottom': '1vw'})
 tp_dd = dcc.Dropdown(id = 'tp_dd', options = tp_list,
-                     value = 'Select a topping', style = word_style('1', 'left'))
+                     value = 'Select a topping', style = dd_style())
 scatter_fig = px.scatter(
   data_frame = drink_info,
   x = 'drink_cal',
   y = 'drink_price',
-  hover_data = ['drink_name'],
-  custom_data = ['drink_name']
+  hover_data = ['drink_full_name'],
+  custom_data = ['drink_full_name']
+#   range_x = [0, 850],
+#   range_y = [20, 85]
 #   title = 'Relationship Between Salary and Certificate Counts'
 )
 scatter_fig.update_layout(
@@ -241,97 +262,84 @@ app.layout = html.Div(
         style = {**put_horizontal('center'), **block_style('full'), 'padding': '0vw 0vw 0vw 5vw', 'gap': '0.5vw'}
     )
 
-# click dropdown -> change plot, picture, drink name, price, calories
+# click dropdown -> change plot, picture, drink name, price, calories, base options, tp options
 @callback(
   Output('scatter_plot', 'figure'),
   Output('drink_pic', 'src'),
   Output('price_text', 'children'),
   Output('cal_text', 'children'),
   Output('name_text', 'children'),
+  Output('base_dd', 'options'),
+  Output('tp_dd', 'options'),
   Input('sw_dd', 'value'),
   Input('base_dd', 'value'),
   Input('tp_dd', 'value'),
+  Input('scatter_plot', 'clickData'),
   allow_duplicate = True
 )
-def update_scatter(sw, base, tp):
+def update_scatter(sw, base, tp, clickData):
     ctx = callback_context
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     new_fig = scatter_fig  # default
     img = '/assets/cup.png'
-    base_option = []
-    tp_options = []
+    price = '--'
+    cal = '--'
+    name = ''
+    base_options = pd.Series(base_list).unique().tolist()
+    tp_options = tp_list
+    new_drink_info = drink_info.copy()
 
-    if trigger_id == 'sw_dd':  # change plot
-        new_drink_info = drink_info.loc[drink_info['drink_name'].str.contains(sw)]
-        new_fig = px.scatter(
-            data_frame = new_drink_info,
-            x = 'drink_cal',
-            y = 'drink_price',
-            hover_data = ['drink_name'],
-            custom_data = ['drink_name']
-            )
-        new_fig.update_layout(
-            font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
-            plot_bgcolor = COLOR_WHITE,
-            xaxis = plot_grid('Calories'),
-            yaxis = plot_grid('Price')
-        )
-        return new_fig
-    
-    elif trigger_id == 'base_dd':  # change data (plot), pic, topping
-        new_drink_info = drink_info.loc[drink_info['drink_base'] == base]
-        new_fig = px.scatter(
-            data_frame = new_drink_info,
-            x = 'drink_cal',
-            y = 'drink_price',
-            hover_data = ['drink_name'],
-            custom_data = ['drink_name']
-            )
-        new_fig.update_layout(
-            font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
-            plot_bgcolor = COLOR_WHITE,
-            xaxis = plot_grid('Calories'),
-            yaxis = plot_grid('Price')
-        )
-        return new_fig, to_pic(base), tp_list #new_drink_info[''].unique().tolist()
-    # else:  # topping -> change data (plot), pic, base
-    return fig, img, price, cal, name
+    # change data and plot
+    if sw is not None:
+        new_drink_info = new_drink_info[new_drink_info['drink_full_name'].str.contains(sw)]
+    if base is not None:
+        new_drink_info = new_drink_info[new_drink_info['drink_base'] == base]
+    if tp is not None:
+        # new_drink_info = new_drink_info[new_drink_info['drink_name'].str.contains(tp)]
+        drinks_with_tp = df_tp.loc[df_tp['tp_name'] == tp, 'drink_name'].unique()
+        new_drink_info = new_drink_info[new_drink_info['drink_name'].isin(drinks_with_tp)]
 
+    new_fig = px.scatter(
+        data_frame = new_drink_info,
+        x = 'drink_cal',
+        y = 'drink_price',
+        hover_data = ['drink_full_name'],
+        custom_data = ['drink_full_name']
+        # range_x = [-10, 810],
+        # range_y = [28, 82]
+    )
+    new_fig.update_layout(
+        font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
+        plot_bgcolor = COLOR_WHITE,
+        xaxis = plot_grid('Calories'),
+        yaxis = plot_grid('Price')
+    )
+    # print(new_drink_info.head())
+    # change pic, name, price, cal, options
+    # if trigger_id == 'sw_dd' and sw is not None:  # change plot
+    if trigger_id == 'base_dd' and base is not None:  # change data (plot), pic, topping
+        img = to_pic(base)
+        tp_options = []
+        for idx, row in new_drink_info.iterrows():
+            current_tp = find_tp(row['drink_full_name'])
+            if current_tp not in tp_options:
+                tp_options.append(current_tp)
 
-# click base -> change data (plot), pic, topping
-@callback(
-  Output('scatter_plot', 'figure'),
-  Output('drink_pic', 'src'),
-  Output('tp_dd', 'options'),
-  
-  allow_duplicate = True
-)
-def base_update_options(base):
-    if base is None:
-        return scatter_fig, '/assets/cup.png', tp_list
-    
-    
-
-# click topping -> change data (plot), pic, base
-
-# click data -> pic, price, calories, name
-@callback(
-  Output('drink_pic', 'src'),
-  Output('price_text', 'children'),
-  Output('cal_text', 'children'),
-  Output('name_text', 'children'),
-  Input('scatter_plot', 'clickData'),
-  allow_duplicate = True
-)
-def update_img(clickData):
-    if clickData is None:
-        return '/assets/cup.png', '--', '--', ''
-    else:
-        drink = clickData['points'][0]['customdata'][0]
-        price = drink_info.loc[drink_info['drink_name'] == drink, 'drink_price']
-        cal = drink_info.loc[drink_info['drink_name'] == drink, 'drink_cal']
-        return to_pic(drink), price, cal, drink
+    if trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
+        if tp != 'NULL':
+            img = to_pic(tp)
+        base_options = []
+        for item in new_drink_info.loc[: , 'drink_base']:
+            if item not in base_options:
+                base_options.append(item)
+        print('base', base_options)
+    elif trigger_id == 'scatter_plot' and clickData is not None:  # change price, name, cal, img
+        name = clickData['points'][0]['customdata'][0]
+        price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']  # .iloc[0]
+        cal = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_cal']  # .iloc[0]
+        img = to_pic(name)
+    return new_fig, img, price, cal, name, base_options, tp_options
 
 if __name__ == '__main__':
 	app.run(debug = True)
