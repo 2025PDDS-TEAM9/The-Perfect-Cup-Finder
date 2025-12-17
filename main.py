@@ -228,6 +228,45 @@ app = Dash()
 
 app.layout = html.Div(
         children = [
+            # dashboard 1
+# 修改大標題顏色 
+    html.H1("Start Your Drink Journey: What's Trending?", 
+            style={'color': '#5C4033', 'textAlign': 'center', 'paddingTop': '20px'}),
+
+    # 放置控制元件的區塊
+    html.Div([
+        html.Label("選擇比較項目:", style={'color': '#5C4033', 'fontWeight': 'bold'}), # 標籤也改深色
+        dcc.Dropdown(
+            id='metric-dropdown',
+            options=[
+                {'label': 'Kcal (熱量)', 'value': 'drink_cal'},
+                {'label': 'Price (價格)', 'value': 'drink_price'},
+                {'label': 'Caffeine (咖啡因)', 'value': 'drink_caff'}
+            ],
+            value='drink_cal',
+            clearable=False,
+            style={'width': '200px', 'marginLeft': '10px'}
+        ),
+        
+        html.Label("排序方式:", style={'marginLeft': '20px', 'color': '#5C4033', 'fontWeight': 'bold'}), # 標籤也改深色
+        dcc.RadioItems(
+            id='sort-order',
+            options=[
+                {'label': '前 10 名 (最高)', 'value': 'descending'},
+                {'label': '最後 10 名 (最低)', 'value': 'ascending'}
+            ],
+            value='descending',
+            style={'marginLeft': '10px', 'display': 'inline-block', 'color': '#5C4033'} # 選項文字也改深色
+        )
+    ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'marginBottom': '20px', 'marginTop': '20px'}),
+
+    # 放置圖表的空位
+    dcc.Graph(id='bar-chart'),
+
+            # dashboard 2
+
+
+            # dashboard 3
             # memory for base and topping options
             dcc.Store(id = 'base_options_store', data = pd.Series(base_list).unique().tolist()),
             dcc.Store(id = 'tp_options_store', data = tp_list),
@@ -257,10 +296,72 @@ app.layout = html.Div(
             ),
             # scatter plot
             html.Div(scatter_plot, style = {'width': '37vw', 'height': '100%', **add_border()})
+        
+            # dashboard 4
         ],
         style = {**put_horizontal('center'), **block_style('full'), 'padding': '0vw 0vw 0vw 5vw', 'gap': '0.5vw'}
     )
 
+# # 設定網頁的外觀 (Layout)
+# app.layout = html.Div([
+    
+
+# # 修改最外層背景色
+# ], style={'backgroundColor': '#EBDEC1', 'minHeight': '100vh', 'padding': '20px'})
+
+
+# dashboard 1 callback
+@callback(
+    Output('bar-chart', 'figure'),
+    Input('metric-dropdown', 'value'),
+    Input('sort-order', 'value')
+)
+def update_graph(selected_metric, sort_order):
+    # 根據選擇的項目排序
+    is_ascending = True if sort_order == 'ascending' else False
+    
+    sorted_df = drink_info.sort_values(by=selected_metric, ascending=is_ascending)
+    
+    # 取出前 10 筆資料
+    top_10_df = sorted_df.head(10)
+    
+
+    labels_map = {
+        'drink_cal': '熱量 (Kcal)',
+        'drink_price': '價格 (NTD)',
+        'drink_caff': '咖啡因 (mg)',
+        'drink_name': '飲料名稱'
+    }
+
+    # 3. 畫圖
+    fig = px.bar(
+        top_10_df,
+        x='drink_name',         
+        y=selected_metric,      
+        text=selected_metric,   
+        labels=labels_map,      
+        title=f"飲料{labels_map[selected_metric]}排名 ({'最低' if is_ascending else '最高'} 10 名)"
+    )
+    
+    
+    fig.update_traces(textposition='outside', marker_color='#5C4033') # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
+
+    fig.update_layout(
+        xaxis={'categoryorder':'total ascending'} if is_ascending else {'categoryorder':'total descending'},
+        height=600,
+        
+        # --- 顏色的設定 ---
+        plot_bgcolor='white',      
+        paper_bgcolor='#EBDEC1',    
+        font_color='#5C4033',       
+        title_font_color='#5C4033', 
+        # -------------------------
+        margin=dict(l=100, r=100, t=100, b=100) 
+    )
+    
+    return fig
+
+# dashboard 3 callback
 # click dropdown -> change plot, picture, drink name, price, calories, base options, tp options
 @callback(
   Output('scatter_plot', 'figure'),
@@ -318,7 +419,6 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
         yaxis = plot_grid('Price')
     )
 
-    print(f'current: sw = {sw}, base = {base}, tp = {tp}')
     # change pic, name, price, cal, options
     if trigger_id == 'sw_dd' and sw is not None:  # change plot
         if len(new_drink_info['drink_name'].unique().tolist()) == 1:
@@ -365,4 +465,4 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
     return new_fig, img, price, cal, name, base_options, tp_options, base_options, tp_options
 
 if __name__ == '__main__':
-	app.run(debug = True)
+    app.run(debug=True)
