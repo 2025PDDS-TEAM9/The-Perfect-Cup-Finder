@@ -208,10 +208,11 @@ scatter_fig = px.scatter(
   data_frame = drink_info,
   x = 'drink_cal',
   y = 'drink_price',
+  color = 'drink_name',
   hover_data = ['drink_full_name'],
-  custom_data = ['drink_full_name']
-#   range_x = [0, 850],
-#   range_y = [20, 85]
+  custom_data = ['drink_full_name'],
+  range_x = [0, 850],
+  range_y = [20, 85]
 #   title = 'Relationship Between Salary and Certificate Counts'
 )
 scatter_fig.update_layout(
@@ -288,13 +289,15 @@ def update_scatter(sw, base, tp, clickData):
     name = ''
     base_options = pd.Series(base_list).unique().tolist()
     tp_options = tp_list
-    new_drink_info = drink_info.copy()
+    # if sw is None and base is None and tp is None and clickData is None:
+        
 
     # change data and plot
+    new_drink_info = drink_info.copy()
     if sw is not None:
-        new_drink_info = new_drink_info[new_drink_info['drink_full_name'].str.contains(sw)]
+        new_drink_info = new_drink_info.loc[new_drink_info['drink_full_name'].str.contains(sw)]
     if base is not None:
-        new_drink_info = new_drink_info[new_drink_info['drink_base'] == base]
+        new_drink_info = new_drink_info.loc[new_drink_info['drink_base'] == base]
     if tp is not None:
         # new_drink_info = new_drink_info[new_drink_info['drink_name'].str.contains(tp)]
         drinks_with_tp = df_tp.loc[df_tp['tp_name'] == tp, 'drink_name'].unique()
@@ -304,10 +307,11 @@ def update_scatter(sw, base, tp, clickData):
         data_frame = new_drink_info,
         x = 'drink_cal',
         y = 'drink_price',
+        color = 'drink_name',
         hover_data = ['drink_full_name'],
-        custom_data = ['drink_full_name']
-        # range_x = [-10, 810],
-        # range_y = [28, 82]
+        custom_data = ['drink_full_name'],
+        range_x = [-10, 810],
+        range_y = [28, 82]
     )
     new_fig.update_layout(
         font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
@@ -317,23 +321,35 @@ def update_scatter(sw, base, tp, clickData):
     )
     # print(new_drink_info.head())
     # change pic, name, price, cal, options
-    # if trigger_id == 'sw_dd' and sw is not None:  # change plot
-    if trigger_id == 'base_dd' and base is not None:  # change data (plot), pic, topping
-        img = to_pic(base)
+    if trigger_id == 'sw_dd' and sw is not None:  # change plot
+        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
+            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
+        elif base is not None:
+            img = to_pic(base)
+        elif tp != 'NULL':
+            img = to_pic(tp)
+
+    elif trigger_id == 'base_dd' and base is not None:  # change data (plot), pic, topping
+        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
+            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
+        else:
+            img = to_pic(base)
         tp_options = []
         for idx, row in new_drink_info.iterrows():
             current_tp = find_tp(row['drink_full_name'])
             if current_tp not in tp_options:
                 tp_options.append(current_tp)
 
-    if trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
-        if tp != 'NULL':
+    elif trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
+        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
+            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
+        elif tp != 'NULL':
             img = to_pic(tp)
         base_options = []
         for item in new_drink_info.loc[: , 'drink_base']:
             if item not in base_options:
                 base_options.append(item)
-        print('base', base_options)
+        
     elif trigger_id == 'scatter_plot' and clickData is not None:  # change price, name, cal, img
         name = clickData['points'][0]['customdata'][0]
         price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']  # .iloc[0]
