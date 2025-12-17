@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 import plotly.express as px
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import Dash, dcc, html, Input, Output, callback, State
 from dash import callback_context
 
 
@@ -59,9 +59,7 @@ def pic(name):
                     style = {'width': '70%', 'marginBottom': '2vw'})
 
 def to_pic(drink):
-    # print(drink)
     file = drink.split(' (')[0].replace("'", '').replace(' ', '_').lower()
-    # print(file)
     return f'/assets/{file}.png'
 
 def find_tp(drink):
@@ -126,7 +124,6 @@ df_tp['tp_cal'] = df_tp['tp_cal'].fillna(0)
 df_tp['tp_caff'] = df_tp['tp_caff'].fillna(0)
 df_sw = pd.DataFrame(data_sw, columns = ['drink_name', 'sw_name', 'sw_cal'])
 drink_info_no_sugar = pd.DataFrame({'drink_name': drink_list})
-# base_list = df_ingr['base_name'].unique().tolist()
 tp_list = df_tp['tp_name'].unique().tolist()
 
 # get base and price (base_price + tp_price)
@@ -227,13 +224,14 @@ scatter_plot = dcc.Graph(
 		    style = {'width': '100%', 'height': '100%'}
             )
 
-# print(type(df_ingr['base_name'].unique().tolist()))
-# print(df_ingr['base_name'].unique())
-
-app = Dash(__name__, prevent_initial_callbacks = True)
+app = Dash()
 
 app.layout = html.Div(
         children = [
+            # memory for base and topping options
+            dcc.Store(id = 'base_options_store', data = pd.Series(base_list).unique().tolist()),
+            dcc.Store(id = 'tp_options_store', data = tp_list),
+
             # dropdown
             html.Div(children = [
                 html.Div('Sweetness', style = {**word_style('1.5', 'left'), 'marginBottom': '0.5vw'}),
@@ -272,13 +270,16 @@ app.layout = html.Div(
   Output('name_text', 'children'),
   Output('base_dd', 'options'),
   Output('tp_dd', 'options'),
+  Output('base_options_store','data'),  # store
+  Output('tp_options_store','data'),  # store
   Input('sw_dd', 'value'),
   Input('base_dd', 'value'),
   Input('tp_dd', 'value'),
   Input('scatter_plot', 'clickData'),
-  allow_duplicate = True
+  State('base_options_store','data'),  # store
+  State('tp_options_store','data')  # store
 )
-def update_scatter(sw, base, tp, clickData):
+def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
     ctx = callback_context
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -287,10 +288,8 @@ def update_scatter(sw, base, tp, clickData):
     price = '--'
     cal = '--'
     name = ''
-    base_options = pd.Series(base_list).unique().tolist()
-    tp_options = tp_list
-    # if sw is None and base is None and tp is None and clickData is None:
-        
+    base_options = base_options_data.copy()
+    tp_options = tp_options_data.copy()  
 
     # change data and plot
     new_drink_info = drink_info.copy()
@@ -299,7 +298,6 @@ def update_scatter(sw, base, tp, clickData):
     if base is not None:
         new_drink_info = new_drink_info.loc[new_drink_info['drink_base'] == base]
     if tp is not None:
-        # new_drink_info = new_drink_info[new_drink_info['drink_name'].str.contains(tp)]
         drinks_with_tp = df_tp.loc[df_tp['tp_name'] == tp, 'drink_name'].unique()
         new_drink_info = new_drink_info[new_drink_info['drink_name'].isin(drinks_with_tp)]
 
@@ -319,7 +317,8 @@ def update_scatter(sw, base, tp, clickData):
         xaxis = plot_grid('Calories'),
         yaxis = plot_grid('Price')
     )
-    # print(new_drink_info.head())
+
+    print(f'current: sw = {sw}, base = {base}, tp = {tp}')
     # change pic, name, price, cal, options
     if trigger_id == 'sw_dd' and sw is not None:  # change plot
         if len(new_drink_info['drink_name'].unique().tolist()) == 1:
@@ -334,10 +333,12 @@ def update_scatter(sw, base, tp, clickData):
             img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
         else:
             img = to_pic(base)
+
         tp_options = []
-        for idx, row in new_drink_info.iterrows():
+        for idx, row in drink_info.iterrows():
             current_tp = find_tp(row['drink_full_name'])
-            if current_tp not in tp_options:
+            current_base = row['drink_base']
+            if current_base == base and current_tp not in tp_options:
                 tp_options.append(current_tp)
 
     elif trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
@@ -345,27 +346,23 @@ def update_scatter(sw, base, tp, clickData):
             img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
         elif tp != 'NULL':
             img = to_pic(tp)
+
         base_options = []
-        for item in new_drink_info.loc[: , 'drink_base']:
-            if item not in base_options:
-                base_options.append(item)
+        for idx, row in drink_info.iterrows():
+            current_tp = find_tp(row['drink_full_name'])
+            current_base = row['drink_base']
+            if current_tp == tp and current_base not in base_options:
+                base_options.append(current_base)
         
     elif trigger_id == 'scatter_plot' and clickData is not None:  # change price, name, cal, img
         name = clickData['points'][0]['customdata'][0]
-        price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']  # .iloc[0]
-        cal = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_cal']  # .iloc[0]
+        price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']
+        cal = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_cal']
         img = to_pic(name)
-    return new_fig, img, price, cal, name, base_options, tp_options
+    elif base is None and tp is None:  # clear base and tp
+        base_options = pd.Series(base_list).unique().tolist()
+        tp_options = tp_list
+    return new_fig, img, price, cal, name, base_options, tp_options, base_options, tp_options
 
 if __name__ == '__main__':
 	app.run(debug = True)
-     
-# note
-# 飲料的ingr: 
-# (drink_id), drink_name, (base_id), base_name, base_price, (ingr_id), ingr_ml, ingr_name, ingr_cal, ingr_caff
-
-# 飲料的topping:
-# (drink_id), drink_name, (tp_id), tp_name, tp_price, tp_cal, tp_caff
-
-# 飲料的甜度:
-# (drink_id), drink_name, (sw_id), sw_name, sw_cal
