@@ -54,6 +54,7 @@ COLOR_LIGHT_BROWN = '#EBDEC1'
 COLOR_DARK_BROWN = '#5C4033'
 COLOR_WHITE = '#FFFFFF'
 COLOR_BLACK = '#000000'
+FONT_FAMILY = 'Arial, sans-serif' #'Consolas, monospace' # 'Inter, Arial, sans-serif'
 BORDER = False
 def pic(name):
     return html.Img(src = f'/assets/{name}.png',
@@ -71,27 +72,49 @@ def find_tp(drink):
     return 'NULL'
 
 def block_style(mode):
-    # if mode == 'full':
-    # else:  # half
-    return {'backgroundColor': COLOR_WHITE,
-            'borderRadius': '20px',
-            # 'padding': '0vw 5vw',  # 3vw
-            'margin': '5vw',
-            'height': '70vh'}
+    if mode == 'full':
+        return {'backgroundColor': COLOR_WHITE,
+                'borderRadius': '20px',
+                # 'padding': '0vw 5vw',  # 3vw
+                'margin': '2vw 5vw 5vw 5vw',
+                'height': '80vh',
+                'width': '80vw',
+                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'}
+    else:  # half
+        return {'backgroundColor': COLOR_WHITE,
+                'borderRadius': '20px',
+                # 'padding': '0vw 5vw',  # 3vw
+                'margin': '2vw 2vw 5vw 2vw',
+                'height': '80vh',
+                'width': '40vw',
+                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'}
+    
 
 def word_style(size, alignment):
     return {'color': COLOR_DARK_BROWN,
-            'fontFamily': 'Arial, sans-serif',
+            'fontFamily': FONT_FAMILY,
             'fontSize': f'{size}vw',
             'fontWeight': 'normal',  # bold, normal, 100~900
             'textAlign': alignment}
 
+def title_style(size, weight, marginTop, marginBottom):
+    return {'color': COLOR_DARK_BROWN,
+            'fontFamily': FONT_FAMILY,
+            'fontSize': f'{size}vw',
+            'fontWeight': weight,  # bold, normal, 100~900
+            'textAlign': 'center',
+            'marginTop': f'{marginTop}vw',
+            'marginBottom': f'{marginBottom}vw'}
+
 def dd_style():
     return {'color': COLOR_BLACK,
-            'fontFamily': 'Arial, sans-serif',
+            'fontFamily': FONT_FAMILY,
             'fontSize': '1vw',
             'fontWeight': 'normal',  # bold, normal, 100~900
-            'textAlign': 'left'}
+            'textAlign': 'left',
+            'border': '1px solid #8B6F47',
+            'borderRadius': '5px'}
+
 
 def put_vertical(alignment):
     return {'display': 'flex', 'flexDirection': 'column', 'alignItems': alignment}
@@ -109,6 +132,13 @@ def plot_grid(title):
                 zerolinecolor = COLOR_LIGHT_BROWN,
                 zerolinewidth = 2
             )
+
+def title(title1, title2):
+    return html.Div([
+                html.H1(title1, style = {'margin': '0','color': COLOR_DARK_BROWN, 'fontWeight': 'bold', 'fontFamily': FONT_FAMILY}),
+                html.H2(title2, style = {'margin': '0','color': COLOR_DARK_BROWN, 'fontWeight': 'normal', 'fontFamily': FONT_FAMILY}),
+            ], style = put_vertical('center'))
+
 
 def add_border():
     if BORDER:
@@ -187,7 +217,56 @@ drink_info = pd.DataFrame({'drink_full_name': all_drink_list_full,
                            'drink_cal': all_cal_list,
                            'drink_caff': all_caff_list})
 
-# dashboard
+# dashboard elements
+# dashboard 1
+bar_dd = dcc.Dropdown(
+                    id='metric-dropdown',
+                    options=[
+                        {'label': 'Kcal (熱量)', 'value': 'drink_cal'},
+                        {'label': 'Price (價格)', 'value': 'drink_price'},
+                        {'label': 'Caffeine (咖啡因)', 'value': 'drink_caff'}
+                    ],
+                    value='drink_cal',
+                    clearable=False,
+                    style={'width': '200px'} #, 'marginLeft': '10px'}
+                )
+bar_radiobtn = dcc.RadioItems(
+                    id='sort-order',
+                    options=[
+                        {'label': '前 10 名 (最高)', 'value': 'descending'},
+                        {'label': '最後 10 名 (最低)', 'value': 'ascending'}
+                    ],
+                    value='descending'
+                    # style={'marginLeft': '10px', 'display': 'inline-block', 'color': '#5C4033'} # 選項文字也改深色
+                )
+bar_select = html.Div([
+                html.Label("選擇比較項目:", style={'color': COLOR_DARK_BROWN, 'fontWeight': 'bold'}), # 標籤也改深色
+                bar_dd,
+                html.Label("排序方式:", style={'color': COLOR_DARK_BROWN, 'fontWeight': 'bold'}), # 標籤也改深色
+                bar_radiobtn
+            ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
+# dashboard 2
+table_dd = html.Div([
+                html.Div('Select Ingredient:', 
+                    style={'fontWeight': '500', 'display': 'block', 'marginBottom': '1vw', **word_style('1', 'left')}),
+                dcc.Dropdown(
+                    id='ingredient',
+                    options=[{'label': row['ingr_name'], 'value': row['ingr_id']} 
+                         for _, row in ingredients.iterrows()],
+                    placeholder='All...',
+                    style={**dd_style(), 'width': '250px'}
+                ),
+            ], style = {'marginLeft': '35px', 'marginTop': '35px'})
+table = html.Div([            
+                html.Div(id='output')
+            ], style={
+                # 'backgroundColor': 'white',
+                'padding': '35px',
+                # 'borderRadius': '15px',
+                # 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+                'minHeight': '400px'
+            })
+# dashboard 3
 sw_dd = dcc.Dropdown(
             id = 'sw_dd',
             options = [
@@ -197,10 +276,10 @@ sw_dd = dcc.Dropdown(
                 {'label': 'No Sugar (0%)', 'value': 'No Sugar'}
             ],
             value = 'Select a sweetness',
-            style = {**dd_style(), 'marginBottom': '1vw'}
+            style = {**dd_style()}
         )
 base_dd = dcc.Dropdown(id = 'base_dd', options = base_list, 
-                       value = 'Select a base', style = {**dd_style(), 'marginBottom': '1vw'})
+                       value = 'Select a base', style = {**dd_style()})
 tp_dd = dcc.Dropdown(id = 'tp_dd', options = tp_list,
                      value = 'Select a topping', style = dd_style())
 scatter_fig = px.scatter(
@@ -217,126 +296,91 @@ scatter_fig = px.scatter(
 scatter_fig.update_layout(
     font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
     plot_bgcolor = COLOR_WHITE,
-    xaxis = plot_grid('Calories'),
-    yaxis = plot_grid('Price')
+    xaxis = plot_grid('Calories (Kcal)'),
+        yaxis = plot_grid('Price (NTD)'),
+    showlegend = False
 )
 scatter_plot = dcc.Graph(
 		    id = 'scatter_plot',
 		    figure = scatter_fig,
 		    style = {'width': '100%', 'height': '100%'}
             )
+scatter_dd = html.Div(children = [
+                html.Div([
+                    html.Div('Sweetness', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
+                    sw_dd
+                ]),
+                html.Div([
+                    html.Div('Base', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
+                    base_dd
+                ]),
+                html.Div([
+                    html.Div('Topping', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
+                    tp_dd
+                ])], style = {'width': '12vw', **put_vertical('left'), **add_border(), 'gap': '1vw'}
+            )
+scatter_cup = html.Div(children = [
+                pic('cup'),
+                html.Div('', id = 'name_text', style = {'height': '2vw', **word_style('1', 'center'), 'width': '85%'})
+                ], style = {'width': '12vw', **put_vertical('center'), **add_border(), 'marginLeft': '1vw'}
+            )
+scatter_big_text = html.Div(children = [
+                html.Div('Price', style = {**word_style('1.5', 'center'), 'marginBottom': '1vw'}),
+                html.Div('--', id = 'price_text', style = {**word_style('3', 'center'), 'marginBottom': '3vw'}),
+                html.Div('Calories', style = {**word_style('1.5', 'center'), 'marginBottom': '1vw'}),
+                html.Div('--', id = 'cal_text', style = word_style('3', 'center'))
+                ], style = {'width': '12vw', **put_vertical('center'), **add_border()}
+            )
+
 
 app = Dash()
 
-app.layout = html.Div(
-        children = [
-            # dashboard 1
-# 修改大標題顏色 
-    html.H1("Start Your Drink Journey: What's Trending?", 
-            style={'color': '#5C4033', 'textAlign': 'center', 'paddingTop': '20px'}),
+app.layout = html.Div(children = 
+                html.Div([
+                    html.Div([
+                        html.Div('The Perfect Cup Finder', style = title_style(2.5, 900, 2, 0.5)),
+                        html.Div('Your Drink Decision Guide', style = title_style(2, 700, 0, 4))
+                    ], style = put_vertical('center')),
+                    
+                    # dashboard 1 and 2 (horizontal)
+                    html.Div([
+                        # dashboard 1
+                        html.Div([
+                            title("Start Your Drink Journey:", "What's Trending on the Menu?"),
+                            html.Div([
+                                bar_select,
+                                dcc.Graph(id='bar-chart')
+                            ], style = {**block_style('half'), **put_vertical('center')})
+                        ], style = put_vertical('center')),
+                        # dashboard 2
+                        html.Div([
+                            title("Choose Your Flavor Base:", "Discover Drinks Made Just for You"),
+                            html.Div([
+                                table_dd, table
+                            ], style = {**block_style('half'), **put_vertical('left')})
+                        ], style = put_vertical('center'))
+                    ], style = put_horizontal('center')),
+                    # dashboard 3
+                    html.Div([
+                        title("Build Your Perfect Cup:", "Customize Sweetness, Base, and Toppings"),
+                        html.Div([
+                            # memory for base and topping options
+                            dcc.Store(id = 'base_options_store', data = pd.Series(base_list).unique().tolist()),
+                            dcc.Store(id = 'tp_options_store', data = tp_list),
 
-    # 放置控制元件的區塊
-    html.Div([
-        html.Label("選擇比較項目:", style={'color': '#5C4033', 'fontWeight': 'bold'}), # 標籤也改深色
-        dcc.Dropdown(
-            id='metric-dropdown',
-            options=[
-                {'label': 'Kcal (熱量)', 'value': 'drink_cal'},
-                {'label': 'Price (價格)', 'value': 'drink_price'},
-                {'label': 'Caffeine (咖啡因)', 'value': 'drink_caff'}
-            ],
-            value='drink_cal',
-            clearable=False,
-            style={'width': '200px', 'marginLeft': '10px'}
-        ),
-        
-        html.Label("排序方式:", style={'marginLeft': '20px', 'color': '#5C4033', 'fontWeight': 'bold'}), # 標籤也改深色
-        dcc.RadioItems(
-            id='sort-order',
-            options=[
-                {'label': '前 10 名 (最高)', 'value': 'descending'},
-                {'label': '最後 10 名 (最低)', 'value': 'ascending'}
-            ],
-            value='descending',
-            style={'marginLeft': '10px', 'display': 'inline-block', 'color': '#5C4033'} # 選項文字也改深色
-        )
-    ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center', 'marginBottom': '20px', 'marginTop': '20px'}),
+                            scatter_dd, scatter_cup, scatter_big_text,
+                            # scatter plot
+                            html.Div(scatter_plot, style = {'width': '40vw', 'height': '100%', **add_border()})
+                        ], style = {**put_horizontal('center'), **block_style('full'), 'padding': '0vw 0vw 0vw 5vw', 'gap': '0.5vw'})
+                    ], style = put_vertical('center')),
+                    # dashboard4
+                    html.Div([
+                        title("Final Showdown:", "Compare Your Top Picks Before You Sip!"),
+                        html.Div([
 
-    # 放置圖表的空位
-    dcc.Graph(id='bar-chart'),
-
-            # dashboard 2
-# 標題
-        html.Div([
-            html.H3('Choose Your Flavor Base:', 
-                    style={'margin': '0', 'color': '#5C4033', 'fontWeight': 'bold'}),
-            html.H4('Discover Drinks Made Just for You', 
-                    style={'margin': '5px 0 0 0', 'color': '#5C4033', 'fontWeight': 'bold'}),
-        ], style={'marginBottom': '25px'}),
-            
-        # 下拉選單
-        html.Div([
-            html.Label('Select Ingredient:', 
-                        style={'fontWeight': '500', 'marginBottom': '8px', 'display': 'block', 'color': '#5C4033'}),
-            dcc.Dropdown(
-                id='ingredient',
-                options=[{'label': row['ingr_name'], 'value': row['ingr_id']} 
-                         for _, row in ingredients.iterrows()],
-                placeholder='All...',
-                style={
-                    'width': '250px',  
-                    'border': '1px solid #8B6F47', 
-                    'borderRadius': '5px'
-                }
-            ),
-        ], style={'marginBottom': '25px'}),
-
-        # 內層（白色部分）
-        html.Div([            
-            html.Div(id='output')
-        ], style={
-            'backgroundColor': 'white',
-            'padding': '35px',
-            'borderRadius': '15px',
-            'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-            'minHeight': '400px'
-        }),
-
-            # dashboard 3
-            # memory for base and topping options
-            dcc.Store(id = 'base_options_store', data = pd.Series(base_list).unique().tolist()),
-            dcc.Store(id = 'tp_options_store', data = tp_list),
-
-            # dropdown
-            html.Div(children = [
-                html.Div('Sweetness', style = {**word_style('1.5', 'left'), 'marginBottom': '0.5vw'}),
-                sw_dd,
-                html.Div('Base', style = {**word_style('1.5', 'left'), 'marginBottom': '0.5vw'}),
-                base_dd,
-                html.Div('Topping', style = {**word_style('1.5', 'left'), 'marginBottom': '0.5vw'}),
-                tp_dd], style = {'width': '16vw', **put_vertical('left'), **add_border()}
-            ),
-            # drink and name
-            html.Div(children = [
-                pic('cup'),
-                html.Div('', id = 'name_text', style = {'height': '2vw', **word_style('1', 'center'), 'width': '85%'})
-                ], style = {'width': '15vw', **put_vertical('center'), **add_border(), 'marginLeft': '1vw'}
-            ),
-            # price and calories
-            html.Div(children = [
-                html.Div('Price', style = {**word_style('2', 'center'), 'marginBottom': '1vw'}),
-                html.Div('--', id = 'price_text', style = {**word_style('5', 'center'), 'marginBottom': '3vw'}),
-                html.Div('Calories', style = {**word_style('2', 'center'), 'marginBottom': '1vw'}),
-                html.Div('--', id = 'cal_text', style = word_style('5', 'center'))
-                ], style = {'width': '12vw', **put_vertical('center'), **add_border()}
-            ),
-            # scatter plot
-            html.Div(scatter_plot, style = {'width': '37vw', 'height': '100%', **add_border()})
-        
-            # dashboard 4
-        ],
-        style = {**put_horizontal('center'), **block_style('full'), 'padding': '0vw 0vw 0vw 5vw', 'gap': '0.5vw'}
-    )
+                        ])
+                    ])
+                ], style = put_vertical('center')))
 
 # # 設定網頁的外觀 (Layout)
 # app.layout = html.Div([
@@ -380,19 +424,20 @@ def update_graph(selected_metric, sort_order):
     )
     
     
-    fig.update_traces(textposition='outside', marker_color='#5C4033') # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
+    fig.update_traces(textposition='outside', marker_color=COLOR_DARK_BROWN) # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
 
     fig.update_layout(
         xaxis={'categoryorder':'total ascending'} if is_ascending else {'categoryorder':'total descending'},
-        height=600,
+        # height=600,
         
         # --- 顏色的設定 ---
         plot_bgcolor='white',      
-        paper_bgcolor='#EBDEC1',    
-        font_color='#5C4033',       
-        title_font_color='#5C4033', 
+        # paper_bgcolor='#EBDEC1',    
+        font_color=COLOR_DARK_BROWN,       
+        title_font_color=COLOR_DARK_BROWN,
         # -------------------------
-        margin=dict(l=100, r=100, t=100, b=100) 
+        # margin=dict(l=100, r=100, t=100, b=100) 
+        title_x = 0.5
     )
     
     return fig
@@ -624,8 +669,9 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
     new_fig.update_layout(
         font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
         plot_bgcolor = COLOR_WHITE,
-        xaxis = plot_grid('Calories'),
-        yaxis = plot_grid('Price')
+        xaxis = plot_grid('Calories (Kcal)'),
+        yaxis = plot_grid('Price (NTD)'),
+        showlegend = False
     )
 
     # change pic, name, price, cal, options
