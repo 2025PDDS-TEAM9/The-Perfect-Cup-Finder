@@ -702,7 +702,7 @@ app.layout = html.Div(
                     ),
                     html.Div(
                         [
-                            title("Choose Your Flavor Base:", "Discover Drinks Made Just for You"),
+                            title("Choose Your Flavor Ingredient:", "Discover Drinks Made Just for You"),
                             html.Div([table_dd, table], style={**block_style("half"), **put_vertical("left")}),
                         ],
                         style=put_vertical("center"),
