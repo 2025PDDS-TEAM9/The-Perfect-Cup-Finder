@@ -54,11 +54,14 @@ conn.close()
 # =========================
 # 2) Styles / Helpers
 # =========================
-COLOR_LIGHT_BROWN = "#EBDEC1"
-COLOR_DARK_BROWN = "#5C4033"
+# 現代奶茶精緻配色
+COLOR_LIGHT_BROWN = "#F9F6F2"  # 更淺、更乾淨的米色背景
+COLOR_DARK_BROWN = "#2D2424"   # 接近黑色的深咖，更有層次感
+COLOR_ACCENT = "#C69774"       # 暖調金/咖，用於按鈕或重點
 COLOR_WHITE = "#FFFFFF"
-COLOR_BLACK = "#000000"
-FONT_FAMILY = "Arial, sans-serif"
+COLOR_GRID = "#EAE2D6"         # 圖表格線專用
+COLOR_BLACK = "#1A1A1A"
+FONT_FAMILY = "Montserrat, sans-serif"
 BORDER = False
 
 
@@ -85,24 +88,29 @@ def find_tp(drink_full_name):
 
 
 def block_style(mode):
+    base_style = {
+        "backgroundColor": COLOR_WHITE,
+        "borderRadius": "24px",         # 更圓潤
+        "margin": "1.5vw",
+        "padding": "2vw",
+        "boxShadow": "0 4px 20px rgba(0,0,0,0.03)", # 變淡、範圍變大
+        "border": f"1px solid {COLOR_GRID}",       # 增加微細邊框
+    }
     if mode == "full":
-        return {
-            "backgroundColor": COLOR_WHITE,
-            "borderRadius": "20px",
-            "margin": "2vw 5vw 5vw 5vw",
-            "height": "80vh",
-            "width": "80vw",
-            "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
-        }
+        base_style.update({"width": "92vw", "minHeight": "70vh"})
     else:
-        return {
-            "backgroundColor": COLOR_WHITE,
-            "borderRadius": "20px",
-            "margin": "2vw 2vw 5vw 2vw",
-            "height": "80vh",
-            "width": "40vw",
-            "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
-        }
+        base_style.update({"width": "45vw", "minHeight": "70vh"})
+    
+    return {
+        "backgroundColor": COLOR_WHITE,
+        "borderRadius": "20px",
+        "margin": "1vw",
+        "padding": "1.5vw",
+        "height": "600px",  # 改用固定高度 px 代替 vh，防止循環跳動
+        "width": "40vw" if mode != "full" else "90vw",
+        "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
+        "overflow": "hidden" # 防止內容溢出導致捲軸閃現
+    }
 
 
 def word_style(size, alignment):
@@ -131,11 +139,11 @@ def dd_style():
     return {
         "color": COLOR_BLACK,
         "fontFamily": FONT_FAMILY,
-        "fontSize": "1vw",
-        "fontWeight": "normal",
+        "fontSize": "0.9rem",      # 使用 rem 代替 vw，在縮放時更穩定
+        "fontWeight": "400",
         "textAlign": "left",
-        "border": "1px solid #8B6F47",
-        "borderRadius": "5px",
+        "borderRadius": "8px",      # 增加圓角
+        "border": "1px solid #E0E0E0", # 使用更淡的邊框顏色
     }
 
 
@@ -647,24 +655,23 @@ app.layout = html.Div(
             ),
             # Dashboard 1 + 2
             html.Div(
-                [
-                    html.Div(
-                        [
-                            title("Start Your Drink Journey:", "What's Trending on the Menu?"),
-                            html.Div([bar_select, dcc.Graph(id="bar-chart")], style={**block_style("half"), **put_vertical("center")}),
-                        ],
-                        style=put_vertical("center"),
-                    ),
-                    html.Div(
-                        [
-                            title("Choose Your Flavor Base:", "Discover Drinks Made Just for You"),
-                            html.Div([table_dd, table], style={**block_style("half"), **put_vertical("left")}),
-                        ],
-                        style=put_vertical("center"),
-                    ),
-                ],
-                style=put_horizontal("center"),
-            ),
+    [
+        # 左邊區塊
+        html.Div([
+            title("Start Your Drink Journey:", "What's Trending?"),
+            html.Div([bar_select, dcc.Graph(id="bar-chart", style={"height": "450px"})], 
+                     style=block_style("half"))
+        ], style={"display":"inline-block", "verticalAlign":"top"}), # 使用 inline-block 較穩定
+        
+        # 右邊區塊
+        html.Div([
+            title("Choose Your Flavor Base:", "Discover Your Taste"),
+            html.Div([table_dd, table], 
+                     style=block_style("half"))
+        ], style={"display":"inline-block", "verticalAlign":"top"}),
+    ],
+    style={"textAlign": "center"}
+),
             # Dashboard 3
             html.Div(
                 [
@@ -736,6 +743,7 @@ def update_graph(selected_metric, sort_order):
         title_font_color=COLOR_DARK_BROWN,
         title_x=0.5,
     )
+    fig.update_layout(autosize=False)
     return fig
 
 
