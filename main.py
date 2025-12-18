@@ -54,14 +54,11 @@ conn.close()
 # =========================
 # 2) Styles / Helpers
 # =========================
-# 現代奶茶精緻配色
-COLOR_LIGHT_BROWN = "#F9F6F2"  # 更淺、更乾淨的米色背景
-COLOR_DARK_BROWN = "#2D2424"   # 接近黑色的深咖，更有層次感
-COLOR_ACCENT = "#C69774"       # 暖調金/咖，用於按鈕或重點
+COLOR_LIGHT_BROWN = "#EBDEC1"
+COLOR_DARK_BROWN = "#5C4033"
 COLOR_WHITE = "#FFFFFF"
-COLOR_GRID = "#EAE2D6"         # 圖表格線專用
-COLOR_BLACK = "#1A1A1A"
-FONT_FAMILY = "Montserrat, sans-serif"
+COLOR_BLACK = "#000000"
+FONT_FAMILY = "Arial, sans-serif"
 BORDER = False
 
 
@@ -88,29 +85,27 @@ def find_tp(drink_full_name):
 
 
 def block_style(mode):
-    base_style = {
-        "backgroundColor": COLOR_WHITE,
-        "borderRadius": "24px",         # 更圓潤
-        "margin": "1.5vw",
-        "padding": "2vw",
-        "boxShadow": "0 4px 20px rgba(0,0,0,0.03)", # 變淡、範圍變大
-        "border": f"1px solid {COLOR_GRID}",       # 增加微細邊框
-    }
     if mode == "full":
-        base_style.update({"width": "92vw", "minHeight": "70vh"})
+        return {
+            "backgroundColor": COLOR_WHITE,
+            "borderRadius": "20px",
+            "margin": "2vw 5vw 5vw 5vw",
+            "height": "80vh",
+            "width": "80vw",
+            "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
+        }
     else:
-        base_style.update({"width": "45vw", "minHeight": "70vh"})
-    
-    return {
-        "backgroundColor": COLOR_WHITE,
-        "borderRadius": "20px",
-        "margin": "1vw",
-        "padding": "1.5vw",
-        "height": "600px",  # 改用固定高度 px 代替 vh，防止循環跳動
-        "width": "40vw" if mode != "full" else "90vw",
-        "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
-        "overflow": "hidden" # 防止內容溢出導致捲軸閃現
-    }
+        return {
+            "backgroundColor": COLOR_WHITE,
+            "borderRadius": "20px",
+            "margin": "2vw 2vw 5vw 2vw",
+            "height": "80vh",
+            "width": "40vw",
+            "boxShadow": "0 2px 8px rgba(0,0,0,0.1)",
+            "overflow": "hidden",
+            "padding": "1.2vw",
+            "boxSizing": "border-box",
+        }
 
 
 def word_style(size, alignment):
@@ -139,11 +134,11 @@ def dd_style():
     return {
         "color": COLOR_BLACK,
         "fontFamily": FONT_FAMILY,
-        "fontSize": "0.9rem",      # 使用 rem 代替 vw，在縮放時更穩定
-        "fontWeight": "400",
+        "fontSize": "1vw",
+        "fontWeight": "normal",
         "textAlign": "left",
-        "borderRadius": "8px",      # 增加圓角
-        "border": "1px solid #E0E0E0", # 使用更淡的邊框顏色
+        "border": "1px solid #8B6F47",
+        "borderRadius": "5px",
     }
 
 
@@ -481,31 +476,46 @@ def radar_fig(left_drink, right_drink):
 bar_dd = dcc.Dropdown(
     id="metric-dropdown",
     options=[
-        {"label": "Kcal (熱量)", "value": "drink_cal"},
-        {"label": "Price (價格)", "value": "drink_price"},
-        {"label": "Caffeine (咖啡因)", "value": "drink_caff"},
+        {"label": "Calories", "value": "drink_cal"},
+        {"label": "Price", "value": "drink_price"},
+        {"label": "Caffeine", "value": "drink_caff"},
     ],
     value="drink_cal",
     clearable=False,
-    style={"width": "200px"},
+    style={**dd_style(), "width": "150px"}
 )
 bar_radiobtn = dcc.RadioItems(
     id="sort-order",
+    style={"fontWeight": "500", "marginRight": "0.6vw", **word_style("1", "left")},
     options=[
-        {"label": "前 10 名 (最高)", "value": "descending"},
-        {"label": "最後 10 名 (最低)", "value": "ascending"},
+        {"label": "Top 10 ( High to Low )", "value": "descending"},
+        {"label": "Last 10 ( Low to High )", "value": "ascending"},
     ],
     value="descending",
 )
 bar_select = html.Div(
     [
-        html.Label("選擇比較項目:", style={"color": COLOR_DARK_BROWN, "fontWeight": "bold"}),
+        html.Div(
+            "Select Item:",
+            style={"fontWeight": "500", "marginRight": "0.6vw", **word_style("1", "left")},
+        ),
         bar_dd,
-        html.Label("排序方式:", style={"color": COLOR_DARK_BROWN, "fontWeight": "bold"}),
+        html.Div(
+            "Sorting:",
+            style={"fontWeight": "500", "marginLeft": "1vw", "marginRight": "0.6vw", **word_style("1", "left")},
+        ),
         bar_radiobtn,
     ],
-    style={"display": "flex", "alignItems": "center", "justifyContent": "center"},
+    style={
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "gap": "0.8vw",
+        "flexWrap": "wrap",
+        "width": "100%",
+    },
 )
+
 
 # Dashboard 2
 table_dd = html.Div(
@@ -521,7 +531,16 @@ table_dd = html.Div(
             style={**dd_style(), "width": "250px"},
         ),
     ],
-    style={"marginLeft": "35px", "marginTop": "35px"},
+    style={
+    "marginTop": "16px",
+    "padding": "0 12px", 
+    "color": "#999",
+    "fontSize": "13px",
+    "textAlign": "center",
+    "maxWidth": "100%",   
+    "whiteSpace": "normal",     
+    "overflowWrap": "anywhere",    
+},
 )
 table = html.Div([html.Div(id="output")], style={"padding": "35px", "minHeight": "400px"})
 
@@ -597,14 +616,18 @@ dash4_block = html.Div(
                 "alignItems": "center",
                 "justifyContent": "space-between",
                 "gap": "2vw",
-                "height": "70vh",
+                "overflow": "visible",
                 "padding": "2vw",
             },
             children=[
                 html.Div(
                     style={"width": "24%", "display": "flex", "flexDirection": "column", "alignItems": "center", "gap": "1vw"},
                     children=[
-                        dcc.Dropdown(id="left_dd", options=drink_options_4, placeholder="Select Drink", value=None, style={"width": "90%"}),
+                        dcc.Dropdown(id="left_dd",
+                                     options=drink_options_4,
+                                     placeholder="Select Drink",
+                                     value=None,
+                                     style={**dd_style(), "width": "250px"}),
                         html.Img(id="left_img", src="/assets/cup.png", style={"width": "70%"}),
                         html.Div(id="left_name", style={**word_style("1", "center"), "minHeight": "2vw"}),
                     ],
@@ -623,7 +646,11 @@ dash4_block = html.Div(
                 html.Div(
                     style={"width": "24%", "display": "flex", "flexDirection": "column", "alignItems": "center", "gap": "1vw"},
                     children=[
-                        dcc.Dropdown(id="right_dd", options=drink_options_4, placeholder="Select Drink", value=None, style={"width": "90%"}),
+                        dcc.Dropdown(id="right_dd",
+                                     options=drink_options_4,
+                                     placeholder="Select Drink",
+                                     value=None,
+                                     style={**dd_style(), "width": "250px"}),
                         html.Img(id="right_img", src="/assets/cup.png", style={"width": "70%"}),
                         html.Div(id="right_name", style={**word_style("1", "center"), "minHeight": "2vw"}),
                     ],
@@ -631,8 +658,18 @@ dash4_block = html.Div(
             ],
         ),
         html.Div(
-            "* Default sweetness used: Less Sugar (Calories includes sw_cal at Less Sugar).",
-            style={"marginTop": "0.5vw", "textAlign": "center", "color": COLOR_DARK_BROWN, "fontFamily": FONT_FAMILY},
+            "* Calories are calculated based on Less Sugar level.",
+            style={
+                "marginBottom": "0.6vw", 
+                "textAlign": "center",
+                "color": "#999",
+                "fontStyle": "italic",
+                "fontSize": "0.85vw",
+                "lineHeight": "1.3",
+                "maxWidth": "100%",
+                "whiteSpace": "normal",
+                "overflowWrap": "anywhere",
+                },
         ),
     ],
 )
@@ -655,23 +692,24 @@ app.layout = html.Div(
             ),
             # Dashboard 1 + 2
             html.Div(
-    [
-        # 左邊區塊
-        html.Div([
-            title("Start Your Drink Journey:", "What's Trending?"),
-            html.Div([bar_select, dcc.Graph(id="bar-chart", style={"height": "450px"})], 
-                     style=block_style("half"))
-        ], style={"display":"inline-block", "verticalAlign":"top"}), # 使用 inline-block 較穩定
-        
-        # 右邊區塊
-        html.Div([
-            title("Choose Your Flavor Base:", "Discover Your Taste"),
-            html.Div([table_dd, table], 
-                     style=block_style("half"))
-        ], style={"display":"inline-block", "verticalAlign":"top"}),
-    ],
-    style={"textAlign": "center"}
-),
+                [
+                    html.Div(
+                        [
+                            title("Start Your Drink Journey:", "What's Trending on the Menu?"),
+                            html.Div([bar_select, dcc.Graph(id="bar-chart")], style={**block_style("half"), **put_vertical("center")}),
+                        ],
+                        style=put_vertical("center"),
+                    ),
+                    html.Div(
+                        [
+                            title("Choose Your Flavor Base:", "Discover Drinks Made Just for You"),
+                            html.Div([table_dd, table], style={**block_style("half"), **put_vertical("left")}),
+                        ],
+                        style=put_vertical("center"),
+                    ),
+                ],
+                style=put_horizontal("center"),
+            ),
             # Dashboard 3
             html.Div(
                 [
@@ -693,7 +731,7 @@ app.layout = html.Div(
             # Dashboard 4
             html.Div(
                 [
-                    title("Final Showdown:", "Compare Your Top Picks Before You Sip!"),
+                    title("Final Decision:", "Compare Your Top Picks Before You Sip!"),
                     dash4_block,
                 ],
                 style=put_vertical("center"),
@@ -720,10 +758,10 @@ def update_graph(selected_metric, sort_order):
     top_10_df = sorted_df.head(10)
 
     labels_map = {
-        "drink_cal": "熱量 (Kcal) [Less Sugar]",
-        "drink_price": "價格 (NTD)",
-        "drink_caff": "咖啡因 (mg)",
-        "drink_name": "飲料名稱",
+        "drink_cal": "Calories (Kcal)",
+        "drink_price": "Price (NTD)",
+        "drink_caff": "Caffeine (mg)",
+        "drink_name": "Drink's Name",
     }
 
     fig = px.bar(
@@ -732,7 +770,7 @@ def update_graph(selected_metric, sort_order):
         y=selected_metric,
         text=selected_metric,
         labels=labels_map,
-        title=f"飲料{labels_map[selected_metric]}排名 ({'最低' if is_ascending else '最高'} 10 名)",
+        title=f" Ranking of Drinks' {labels_map[selected_metric]} ({'Last' if is_ascending else 'Top'} 10)",
     )
 
     fig.update_traces(textposition="outside", marker_color=COLOR_DARK_BROWN)
@@ -743,7 +781,6 @@ def update_graph(selected_metric, sort_order):
         title_font_color=COLOR_DARK_BROWN,
         title_x=0.5,
     )
-    fig.update_layout(autosize=False)
     return fig
 
 
@@ -850,6 +887,8 @@ def show_drinks(ingr_id):
                 sort_action="native",
                 page_action="native",
                 page_size=10,
+
+
                 style_header={
                     "backgroundColor": "#8B6F47",
                     "color": "white",
