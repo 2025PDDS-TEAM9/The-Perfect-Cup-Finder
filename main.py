@@ -222,7 +222,15 @@ def radar_fig(left_drink, right_drink):
         row = plot_df.loc[plot_df["drink_name"] == drink]
         return None if row.empty else row.iloc[0]
 
-    def rvals(drink):
+    def raw_values(drink):
+        row = get_row(drink)
+        if row is None:
+            vals = [None] * len(cats)
+        else:
+            vals = [float(row[RADAR_COLS[c]]) for c in cats]
+        return vals + [vals[0]]
+
+    def scaled_values(drink):
         row = get_row(drink)
         if row is None:
             vals = [0.0] * len(cats)
@@ -230,37 +238,51 @@ def radar_fig(left_drink, right_drink):
             vals = [norm_0_10(c, row[RADAR_COLS[c]]) for c in cats]
         return vals + [vals[0]]
 
-    def raw_vals_for_hover(drink):
-        """依照 theta 順序回傳『該點對應 metric 的原始值』；最後一個重複首點"""
-        row = get_row(drink)
-        if row is None:
-            raw = [None] * len(cats)
-        else:
-            raw = [float(row[RADAR_COLS[c]]) for c in cats]
-        raw_closed = raw + [raw[0]]
-        return raw_closed
+    def fmt(metric, v):
+        if v is None:
+            return "—"
+        if metric == "Price":
+            return f"{v:.2f}"
+        if metric in ("Calories", "Caffeine", "Toppings"):
+            return f"{v:.0f}"
+        return f"{v:.2f}"
 
-    HOVER_TMPL_LEFT = "<b>Left</b><br>Metric: %{theta}<br>Value: %{customdata}<extra></extra>"
-    HOVER_TMPL_RIGHT = "<b>Right</b><br>Metric: %{theta}<br>Value: %{customdata}<extra></extra>"
+    left_raw = raw_values(left_drink)
+    right_raw = raw_values(right_drink)
+
+    left_name = left_drink or "Drink A"
+    right_name = right_drink or "Drink B"
+
+    # ✅ hover: 顯示當前 metric + 兩杯的「飲料名: 值」
+    hover_text = []
+    for i, m in enumerate(cats_closed):
+        hover_text.append(
+            f"<b>Metric:</b> {m}<br>"
+            f"<b>{left_name}:</b> {fmt(m, left_raw[i])}<br>"
+            f"<b>{right_name}:</b> {fmt(m, right_raw[i])}"
+        )
 
     fig = go.Figure()
 
+    # 先畫右再畫左，左在上層較好 hover
     fig.add_trace(go.Scatterpolar(
-        r=rvals(left_drink),
+        r=scaled_values(right_drink),
         theta=cats_closed,
         fill="toself",
-        name="Left",
-        customdata=raw_vals_for_hover(left_drink),
-        hovertemplate=HOVER_TMPL_LEFT,
+        name=right_name,
+        mode="lines+markers",
+        text=hover_text,
+        hovertemplate="%{text}<extra></extra>",
     ))
 
     fig.add_trace(go.Scatterpolar(
-        r=rvals(right_drink),
+        r=scaled_values(left_drink),
         theta=cats_closed,
         fill="toself",
-        name="Right",
-        customdata=raw_vals_for_hover(right_drink),
-        hovertemplate=HOVER_TMPL_RIGHT,
+        name=left_name,
+        mode="lines+markers",
+        text=hover_text,
+        hovertemplate="%{text}<extra></extra>",
     ))
 
     fig.update_layout(
@@ -269,23 +291,15 @@ def radar_fig(left_drink, right_drink):
         font=dict(family="Arial, sans-serif", size=14, color=COLOR_DARK_BROWN),
         showlegend=False,
         margin=dict(l=10, r=10, t=10, b=10),
+        hovermode="closest",
         polar=dict(
             domain=dict(x=[0.07, 0.93], y=[0.07, 0.93]),
-            radialaxis=dict(
-                visible=True,
-                range=[0, 10],
-                showticklabels=False,
-                gridcolor=COLOR_LIGHT_BROWN,
-            ),
-            angularaxis=dict(
-                gridcolor=COLOR_LIGHT_BROWN,
-                tickfont=dict(size=12),
-                rotation=90,
-                direction="clockwise",
-            ),
+            radialaxis=dict(visible=True, range=[0, 10], showticklabels=False, gridcolor=COLOR_LIGHT_BROWN),
+            angularaxis=dict(gridcolor=COLOR_LIGHT_BROWN, tickfont=dict(size=12), rotation=90, direction="clockwise"),
         ),
     )
     return fig
+
 
 # 5) Dash layout (Compare only)
 app = Dash(__name__)
