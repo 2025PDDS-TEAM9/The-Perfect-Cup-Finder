@@ -1043,6 +1043,6 @@ def update_compare(left_drink, right_drink):
 
     return fig, left_src, (left_drink or ""), right_src, (right_drink or "")
 
-
+server = app.server
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run_server(debug=True)
