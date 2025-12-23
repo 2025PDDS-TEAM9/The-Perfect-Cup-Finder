@@ -1,6 +1,8 @@
 import sqlite3
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
 from dash import Dash, dcc, html, Input, Output, callback, State, dash_table
 from dash import callback_context
 
@@ -47,15 +49,21 @@ data_sw = cursor.fetchall()
 
 ingredients = pd.read_sql_query("SELECT ingr_id, ingr_name FROM Ingredient", conn)
 
+cursor.execute("SELECT drink_name FROM Drink")
+data_drink = cursor.fetchall()
+
+
 conn.close()
 
 # style definition
 COLOR_LIGHT_BROWN = '#EBDEC1'
+COLOR_MIDDLE_BROWN = '#F4F0E9'
 COLOR_DARK_BROWN = '#5C4033'
 COLOR_WHITE = '#FFFFFF'
 COLOR_BLACK = '#000000'
 FONT_FAMILY = 'Arial, sans-serif' #'Consolas, monospace' # 'Inter, Arial, sans-serif'
 BORDER = False
+# BORDER = True
 def pic(name):
     return html.Img(src = f'/assets/{name}.png',
                     id = 'drink_pic',
@@ -76,7 +84,7 @@ def block_style(mode):
         return {'backgroundColor': COLOR_WHITE,
                 'borderRadius': '20px',
                 # 'padding': '0vw 5vw',  # 3vw
-                'margin': '2vw 5vw 5vw 5vw',
+                'margin': '1vw 5vw 5vw 5vw',
                 'height': '80vh',
                 'width': '80vw',
                 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'}
@@ -84,7 +92,7 @@ def block_style(mode):
         return {'backgroundColor': COLOR_WHITE,
                 'borderRadius': '20px',
                 # 'padding': '0vw 5vw',  # 3vw
-                'margin': '2vw 2vw 5vw 2vw',
+                'margin': '1vw 2vw 5vw 2vw',
                 'height': '80vh',
                 'width': '40vw',
                 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'}
@@ -97,30 +105,28 @@ def word_style(size, alignment):
             'fontWeight': 'normal',  # bold, normal, 100~900
             'textAlign': alignment}
 
-def title_style(size, weight, marginTop, marginBottom):
-    return {'color': COLOR_DARK_BROWN,
-            'fontFamily': FONT_FAMILY,
-            'fontSize': f'{size}vw',
-            'fontWeight': weight,  # bold, normal, 100~900
-            'textAlign': 'center',
-            'marginTop': f'{marginTop}vw',
-            'marginBottom': f'{marginBottom}vw'}
-
 def dd_style():
     return {'color': COLOR_BLACK,
             'fontFamily': FONT_FAMILY,
             'fontSize': '1vw',
             'fontWeight': 'normal',  # bold, normal, 100~900
             'textAlign': 'left',
-            'border': '1px solid #8B6F47',
-            'borderRadius': '5px'}
+            # 'border': '1px solid #8B6F47',
+            'borderRadius': '4px',
+            # 'width': '60%',
+            # 'boxSizing': 'border-box'
+            }
 
+def dd_border(ratio):
+    return {'border': '1px solid #5C4033',
+            'borderRadius': '5px',
+            'width': ratio}
 
 def put_vertical(alignment):
-    return {'display': 'flex', 'flexDirection': 'column', 'alignItems': alignment}
+    return {'display': 'flex', 'flexDirection': 'column', 'alignItems': alignment, 'justifyContent': 'center'}
 
 def put_horizontal(alignment):
-    return {'display': 'flex', 'flexDirection': 'row', 'alignItems': alignment}
+    return {'display': 'flex', 'flexDirection': 'row', 'alignItems': alignment, 'justifyContent': 'center'}
 
 def plot_grid(title):
     return dict(
@@ -133,12 +139,40 @@ def plot_grid(title):
                 zerolinewidth = 2
             )
 
-def title(title1, title2):
-    return html.Div([
-                html.H1(title1, style = {'margin': '0','color': COLOR_DARK_BROWN, 'fontWeight': 'bold', 'fontFamily': FONT_FAMILY}),
-                html.H2(title2, style = {'margin': '0','color': COLOR_DARK_BROWN, 'fontWeight': 'normal', 'fontFamily': FONT_FAMILY}),
-            ], style = put_vertical('center'))
+def title_style(size, weight, marginTop, marginBottom):
+    return {'color': COLOR_DARK_BROWN,
+            'fontFamily': FONT_FAMILY,
+            'fontSize': f'{size}vw',
+            'fontWeight': weight,  # bold, normal, 100~900
+            'textAlign': 'center',
+            'marginTop': f'{marginTop}vw',
+            'marginBottom': f'{marginBottom}vw'}
 
+def title(title1, title2, type):
+    if type == 'big':
+        return html.Div([
+                    html.Div(title1, style = title_style(3, 900, 2, 0.5)),
+                    html.Div(title2, style = title_style(2.5, 700, 0, 4))
+                ], style = put_vertical('center'))
+    else:
+        return html.Div([
+                    html.Div(title1, style = title_style(2, 750, 0, 0.5)),
+                    html.Div(title2, style = title_style(1.7, 500, 0, 0)),
+                ], style = put_vertical('center'))
+
+def default_sw(text):
+    return html.Div(
+                text,
+                style={
+                    # 'marginTop': '1vh',
+                    'fontStyle': 'italic',
+                    'color': '#999',
+                    'fontSize': '13px',
+                    'textAlign': 'center',
+                    'fontFamily': FONT_FAMILY,
+                    **add_border()
+                }
+            )
 
 def add_border():
     if BORDER:
@@ -217,55 +251,136 @@ drink_info = pd.DataFrame({'drink_full_name': all_drink_list_full,
                            'drink_cal': all_cal_list,
                            'drink_caff': all_caff_list})
 
+# base info per drink (base_name/base_price)
+base_info = (
+    df_ingr.groupby("drink_name", as_index=False)
+    .agg(base_name=("base_name", "first"), base_price=("base_price", "first"))
+)
+
+# base calories/caffeine from ingredients
+base_cal = (
+    df_ingr.assign(base_cal_part=lambda d: d["ingr_cal"] * d["ingr_ml"] / 100)
+    .groupby("drink_name", as_index=False)["base_cal_part"]
+    .sum()
+    .rename(columns={"base_cal_part": "base_cal"})
+)
+
+base_caff = (
+    df_ingr.assign(base_caff_part=lambda d: d["ingr_caff"] * d["ingr_ml"] / 100)
+    .groupby("drink_name", as_index=False)["base_caff_part"]
+    .sum()
+    .rename(columns={"base_caff_part": "base_caff"})
+)
+
+# topping aggregation per drink (support multiple toppings)
+tp_agg = (
+    df_tp[df_tp["tp_name"] != "NULL"]
+    .groupby("drink_name", as_index=False)
+    .agg(
+        tp_price=("tp_price", "sum"),
+        tp_cal=("tp_cal", "sum"),
+        tp_caff=("tp_caff", "sum"),
+        toppings=("tp_name", "count"),
+    )
+)
+
+# drinks with no topping -> fill 0
+drink_base = pd.DataFrame({"drink_name": drink_list})
+drink_base = drink_base.merge(base_info, on="drink_name", how="left")
+drink_base = drink_base.merge(base_cal, on="drink_name", how="left")
+drink_base = drink_base.merge(base_caff, on="drink_name", how="left")
+drink_base = drink_base.merge(tp_agg, on="drink_name", how="left")
+
+for c in ["base_price", "base_cal", "base_caff", "tp_price", "tp_cal", "tp_caff", "toppings"]:
+    if c in drink_base.columns:
+        drink_base[c] = drink_base[c].fillna(0)
+
+# pick default sweetness per drink: Less Sugar if exists else first
+def pick_default_sweetness(df, prefer="Less Sugar"):
+    rows = []
+    for dn, g in df.groupby("drink_name"):
+        prefer_rows = g[g["sw_name"] == prefer]
+        rows.append(prefer_rows.iloc[0] if not prefer_rows.empty else g.iloc[0])
+    return pd.DataFrame(rows)
+
+df_sw_default = pick_default_sweetness(df_sw, prefer="Less Sugar")
+
+# final metrics table (default sweetness)
+drink_info_2 = drink_base.merge(df_sw_default, on="drink_name", how="left")
+
+# Price = base_price + Σ(tp_price)
+drink_info_2["price"] = drink_info_2["base_price"] + drink_info_2["tp_price"]
+
+# Calories = Σ(ingr_cal*ml/100) + Σ(tp_cal) + sw_cal
+drink_info_2["calories"] = drink_info_2["base_cal"] + drink_info_2["tp_cal"] + drink_info_2["sw_cal"]
+
+# Caffeine = Σ(ingr_caff*ml/100) + Σ(tp_caff)
+drink_info_2["caffeine"] = drink_info_2["base_caff"] + drink_info_2["tp_caff"]
+
+# Keep only needed columns
+plot_df = drink_info_2[["drink_name", "price", "calories", "caffeine", "toppings", "sw_name"]].copy()
+
 # dashboard elements
 # dashboard 1
 bar_dd = dcc.Dropdown(
                     id='metric-dropdown',
                     options=[
-                        {'label': 'Kcal (熱量)', 'value': 'drink_cal'},
-                        {'label': 'Price (價格)', 'value': 'drink_price'},
-                        {'label': 'Caffeine (咖啡因)', 'value': 'drink_caff'}
+                        {'label': 'Calories', 'value': 'drink_cal'},
+                        {'label': 'Price', 'value': 'drink_price'},
+                        {'label': 'Caffeine', 'value': 'drink_caff'}
                     ],
                     value='drink_cal',
                     clearable=False,
-                    style={'width': '200px'} #, 'marginLeft': '10px'}
+                    style=dd_style() #{'width': '200px'} #, 'marginLeft': '10px'}
                 )
 bar_radiobtn = dcc.RadioItems(
                     id='sort-order',
                     options=[
-                        {'label': '前 10 名 (最高)', 'value': 'descending'},
-                        {'label': '最後 10 名 (最低)', 'value': 'ascending'}
+                        {'label': 'From High to Low', 'value': 'descending'},
+                        {'label': 'From Low to High', 'value': 'ascending'}
                     ],
-                    value='descending'
+                    value='descending',
+                    style = {**dd_style(), **put_vertical('center')}
                     # style={'marginLeft': '10px', 'display': 'inline-block', 'color': '#5C4033'} # 選項文字也改深色
                 )
 bar_select = html.Div([
-                html.Label("選擇比較項目:", style={'color': COLOR_DARK_BROWN, 'fontWeight': 'bold'}), # 標籤也改深色
-                bar_dd,
-                html.Label("排序方式:", style={'color': COLOR_DARK_BROWN, 'fontWeight': 'bold'}), # 標籤也改深色
-                bar_radiobtn
-            ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
+                # sort by
+                html.Div([
+                    html.Label("Sort by", style=word_style('1', 'left')), # 標籤也改深色
+                    html.Div(bar_dd, style = dd_border('60%'))
+                ], style = {**put_horizontal('center'), 'width': '16vw', **add_border(), 'gap': '1vw'}),
+                # order
+                html.Div([
+                    html.Label("Order", style=word_style('1', 'left')), # 標籤也改深色
+                    bar_radiobtn
+                ], style = {**put_horizontal('center'), 'width': '16vw', **add_border(), 'gap': '1vw'})  
+            ], style={**put_horizontal('center'), 'width': '35vw', 'marginTop': '4vh', 'marginBottom': '3vh'})
 # dashboard 2
 table_dd = html.Div([
                 html.Div('Select Ingredient:', 
-                    style={'fontWeight': '500', 'display': 'block', 'marginBottom': '1vw', **word_style('1', 'left')}),
-                dcc.Dropdown(
-                    id='ingredient',
-                    options=[{'label': row['ingr_name'], 'value': row['ingr_id']} 
-                         for _, row in ingredients.iterrows()],
-                    placeholder='All...',
-                    style={**dd_style(), 'width': '250px'}
-                ),
-            ], style = {'marginLeft': '35px', 'marginTop': '35px'})
+                    style={'fontWeight': '500', 'display': 'block', **word_style('1.2', 'left')}),
+                html.Div(
+                    dcc.Dropdown(
+                        id='ingredient',
+                        options=[{'label': row['ingr_name'], 'value': row['ingr_id']} 
+                            for _, row in ingredients.iterrows()],
+                        placeholder='Select a Ingredients',
+                        style={**dd_style()}
+                ), style = dd_border('50%')),
+            ], style = {**put_horizontal('center'), **add_border(), 'marginTop': '4vh', 'marginBottom': '3vh', 'width': '30vw', 'gap': '2vh'})
 table = html.Div([            
                 html.Div(id='output')
             ], style={
                 # 'backgroundColor': 'white',
-                'padding': '35px',
+                # 'padding': '35px',
                 # 'borderRadius': '15px',
                 # 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-                'minHeight': '400px'
+                # 'minHeight': '400px',
+                **add_border(),
+                'height': '54vh',
+                'width': '35vw'
             })
+
 # dashboard 3
 sw_dd = dcc.Dropdown(
             id = 'sw_dd',
@@ -275,13 +390,13 @@ sw_dd = dcc.Dropdown(
                 {'label': 'Less Sugar (20%)', 'value': 'Less Sugar'},
                 {'label': 'No Sugar (0%)', 'value': 'No Sugar'}
             ],
-            value = 'Select a sweetness',
+            placeholder = 'Select a Sweetness',
             style = {**dd_style()}
         )
 base_dd = dcc.Dropdown(id = 'base_dd', options = base_list, 
-                       value = 'Select a base', style = {**dd_style()})
+                       placeholder = 'Select a Base', style = {**dd_style()})
 tp_dd = dcc.Dropdown(id = 'tp_dd', options = tp_list,
-                     value = 'Select a topping', style = dd_style())
+                     placeholder = 'Select a Topping', style = dd_style())
 scatter_fig = px.scatter(
   data_frame = drink_info,
   x = 'drink_cal',
@@ -294,11 +409,12 @@ scatter_fig = px.scatter(
 #   title = 'Relationship Between Salary and Certificate Counts'
 )
 scatter_fig.update_layout(
-    font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
+    font = dict(family = 'Arial, sans-serif', size = 14, color = COLOR_DARK_BROWN),
     plot_bgcolor = COLOR_WHITE,
     xaxis = plot_grid('Calories (Kcal)'),
         yaxis = plot_grid('Price (NTD)'),
-    showlegend = False
+    showlegend = False,
+    margin = dict(l = 0, r = 0, t = 0, b = 0)
 )
 scatter_plot = dcc.Graph(
 		    id = 'scatter_plot',
@@ -308,15 +424,15 @@ scatter_plot = dcc.Graph(
 scatter_dd = html.Div(children = [
                 html.Div([
                     html.Div('Sweetness', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
-                    sw_dd
+                    html.Div(sw_dd, style = dd_border('100%'))
                 ]),
                 html.Div([
                     html.Div('Base', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
-                    base_dd
+                    html.Div(base_dd, style = dd_border('100%'))
                 ]),
                 html.Div([
                     html.Div('Topping', style = {**word_style('1', 'left'), 'marginBottom': '0.5vw'}),
-                    tp_dd
+                    html.Div(tp_dd, style = dd_border('100%'))
                 ])], style = {'width': '12vw', **put_vertical('left'), **add_border(), 'gap': '1vw'}
             )
 scatter_cup = html.Div(children = [
@@ -332,37 +448,198 @@ scatter_big_text = html.Div(children = [
                 ], style = {'width': '12vw', **put_vertical('center'), **add_border()}
             )
 
+# dashboard 4
+# 4) Radar chart (4 metrics) + normalize 0–10
+RADAR_COLS = {
+    "Calories": "calories",
+    "Price": "price",
+    "Caffeine": "caffeine",
+    "Toppings": "toppings",
+}
+
+# strong scaling for Calories & Price: percentile(rank) on log1p values
+def transform(metric, x):
+    x = float(x)
+    if metric in ("Calories", "Price"):
+        return float(np.log1p(max(x, 0)))
+    return x
+
+# precompute sorted distributions (after transform) for percentile scaling
+dist = {}
+bounds = {}
+for metric, col in RADAR_COLS.items():
+    s = plot_df[col].astype(float).apply(lambda v: transform(metric, v))
+    dist[metric] = np.sort(s.to_numpy())
+
+    lo = float(np.quantile(dist[metric], 0.05))
+    hi = float(np.quantile(dist[metric], 0.95))
+    if hi <= lo:  # fallback
+        lo = float(dist[metric].min())
+        hi = float(dist[metric].max())
+    bounds[metric] = (lo, hi)
+
+def percentile_0_10(metric, val):
+    arr = dist[metric]
+    if arr.size <= 1:
+        return 0.0
+    x = transform(metric, val)
+    # clamp to robust bounds before percentile
+    lo, hi = bounds[metric]
+    x = max(lo, min(x, hi))
+    # percentile rank (0~1)
+    p = np.searchsorted(arr, x, side="left") / (arr.size - 1)
+    return 10.0 * float(p)
+
+def norm_0_10(metric, val):
+    if metric in ("Calories", "Price"):
+        return percentile_0_10(metric, val)
+
+    # 其他指標用 robust min-max
+    lo, hi = bounds[metric]
+    x = transform(metric, val)
+    x = max(lo, min(x, hi))
+    if hi - lo == 0:
+        return 0.0
+    return 10.0 * (x - lo) / (hi - lo)
+
+
+def radar_fig(left_drink, right_drink):
+    cats = list(RADAR_COLS.keys())
+    cats_closed = cats + [cats[0]]
+
+    def get_row(drink):
+        if not drink:
+            return None
+        row = plot_df.loc[plot_df["drink_name"] == drink]
+        return None if row.empty else row.iloc[0]
+
+    def rvals(drink):
+        row = get_row(drink)
+        if row is None:
+            vals = [0.0] * len(cats)
+        else:
+            vals = [norm_0_10(c, row[RADAR_COLS[c]]) for c in cats]
+        return vals + [vals[0]]
+
+    def raw_vals_for_hover(drink):
+        """依照 theta 順序回傳『該點對應 metric 的原始值』；最後一個重複首點"""
+        row = get_row(drink)
+        if row is None:
+            raw = [None] * len(cats)
+        else:
+            raw = [float(row[RADAR_COLS[c]]) for c in cats]
+        raw_closed = raw + [raw[0]]
+        return raw_closed
+
+    HOVER_TMPL_LEFT = "<b>Left</b><br>Metric: %{theta}<br>Value: %{customdata}<extra></extra>"
+    HOVER_TMPL_RIGHT = "<b>Right</b><br>Metric: %{theta}<br>Value: %{customdata}<extra></extra>"
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=rvals(left_drink),
+        theta=cats_closed,
+        fill="toself",
+        name="Left",
+        customdata=raw_vals_for_hover(left_drink),
+        hovertemplate=HOVER_TMPL_LEFT,
+    ))
+
+    fig.add_trace(go.Scatterpolar(
+        r=rvals(right_drink),
+        theta=cats_closed,
+        fill="toself",
+        name="Right",
+        customdata=raw_vals_for_hover(right_drink),
+        hovertemplate=HOVER_TMPL_RIGHT,
+    ))
+
+    fig.update_layout(
+        paper_bgcolor=COLOR_WHITE,
+        plot_bgcolor=COLOR_WHITE,
+        font=dict(family=FONT_FAMILY, size=14, color=COLOR_DARK_BROWN),
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        polar=dict(
+            domain=dict(x=[0.07, 0.93], y=[0.07, 0.93]),
+            radialaxis=dict(
+                visible=True,
+                range=[0, 10],
+                showticklabels=False,
+                gridcolor=COLOR_LIGHT_BROWN,
+            ),
+            angularaxis=dict(
+                gridcolor=COLOR_LIGHT_BROWN,
+                tickfont=dict(size=14),
+                rotation=90,
+                direction="clockwise",
+            ),
+        ),
+    )
+    return fig
+
+drink_options = [{"label": n, "value": n} for n in sorted(plot_df["drink_name"].unique())]
+
+radar_left_dd = dcc.Dropdown(
+                    id="left_dd",
+                    options=drink_options,
+                    placeholder="Select a Drink",
+                    value=None,
+                    style=dd_style(),
+                )
+radar_left_cup = html.Img(id="left_img", src="/assets/cup.png", style={"width": "70%"})
+radar_left_name = html.Div(id="left_name", style={**word_style("1.0", "center"), "minHeight": "2vw"})
+
+radar = dcc.Graph(
+            id="radar",
+            figure=radar_fig(None, None),
+            style={'height': '100%', 'width': '100%', **add_border()}
+        )
+
+radar_right_dd = dcc.Dropdown(
+                    id="right_dd",
+                    options=drink_options,
+                    placeholder="Select a Drink",
+                    value=None,
+                    style=dd_style(),
+                )
+radar_right_cup = html.Img(id="right_img", src="/assets/cup.png", style={"width": "70%"})
+radar_right_name = html.Div(id="right_name", style={**word_style("1.0", "center"), "minHeight": "2vw"})
 
 app = Dash()
 
 app.layout = html.Div(children = 
                 html.Div([
-                    html.Div([
-                        html.Div('The Perfect Cup Finder', style = title_style(2.5, 900, 2, 0.5)),
-                        html.Div('Your Drink Decision Guide', style = title_style(2, 700, 0, 4))
-                    ], style = put_vertical('center')),
-                    
+                    title('The Perfect Cup Finder', 'Your Drink Decision Guide', 'big'),
+
                     # dashboard 1 and 2 (horizontal)
                     html.Div([
                         # dashboard 1
                         html.Div([
-                            title("Start Your Drink Journey:", "What's Trending on the Menu?"),
+                            title('Start Your Drink Journey:', "What's Trending on the Menu?", 'small'),
                             html.Div([
                                 bar_select,
-                                dcc.Graph(id='bar-chart')
+                                html.Div(dcc.Graph(id='bar-chart'), style = {'width': '35vw', 'height': '56vh', **add_border()}),
+                                html.Div(default_sw('* Default sweetness for all drinks: No Sugar.'),
+                                         style = {'marginBottom': '5vh', 'marginTop': '2vh'})
                             ], style = {**block_style('half'), **put_vertical('center')})
                         ], style = put_vertical('center')),
                         # dashboard 2
                         html.Div([
-                            title("Choose Your Flavor Base:", "Discover Drinks Made Just for You"),
+                            title('Choose Your Flavor Ingredient:', 'Discover Drinks Made Just for You', 'small'),
                             html.Div([
-                                table_dd, table
+                                table_dd,
+                                html.Div([
+                                    table,
+                                    html.Div(default_sw('* Calories are calculated based on Less Sugar level.'),
+                                        style = {'marginBottom': '5vh', 'marginTop': '2vh'})
+                                ], style = {**put_vertical('center')})
                             ], style = {**block_style('half'), **put_vertical('left')})
                         ], style = put_vertical('center'))
                     ], style = put_horizontal('center')),
                     # dashboard 3
                     html.Div([
-                        title("Build Your Perfect Cup:", "Customize Sweetness, Base, and Toppings"),
+                        title('Build Your Perfect Cup:', 'Customize Sweetness, Base, and Toppings', 'small'),
                         html.Div([
                             # memory for base and topping options
                             dcc.Store(id = 'base_options_store', data = pd.Series(base_list).unique().tolist()),
@@ -375,11 +652,25 @@ app.layout = html.Div(children =
                     ], style = put_vertical('center')),
                     # dashboard4
                     html.Div([
-                        title("Final Showdown:", "Compare Your Top Picks Before You Sip!"),
+                        title('Final Decision:', 'Compare Your Top Picks Before You Sip!', 'small'),
                         html.Div([
-
-                        ])
-                    ])
+                            # dd and plot
+                            html.Div([
+                                # left
+                                html.Div([
+                                    html.Div(radar_left_dd, style = dd_border('100%')), radar_left_cup, radar_left_name
+                                ], style = {**add_border(), **put_vertical('center'), 'width': '15vw', 'gap': '4vh'}),
+                                # radar
+                                html.Div(radar, style = {'height': '60vh', 'width': '80vh'}),
+                                # right
+                                html.Div([
+                                    html.Div(radar_right_dd, style = dd_border('100%')), radar_right_cup, radar_right_name
+                                ], style = {**add_border(), **put_vertical('center'), 'width': '15vw', 'gap': '4vh'})
+                            ], style = {**put_horizontal('center'), 'gap': '1vw'}),
+                            # annotation
+                            default_sw('* Default sweetness for all drinks: Less Sugar (fallback to first available if missing).')
+                        ], style = {**put_vertical('center'), **block_style('full'), 'gap': '4vh'})
+                    ], style = put_vertical('center'))
                 ], style = put_vertical('center')))
 
 # # 設定網頁的外觀 (Layout)
@@ -400,17 +691,17 @@ def update_graph(selected_metric, sort_order):
     # 根據選擇的項目排序
     is_ascending = True if sort_order == 'ascending' else False
     
-    sorted_df = drink_info.sort_values(by=selected_metric, ascending=is_ascending)
+    sorted_df = drink_info_no_sugar.sort_values(by=selected_metric, ascending=is_ascending)
     
     # 取出前 10 筆資料
     top_10_df = sorted_df.head(10)
     
 
     labels_map = {
-        'drink_cal': '熱量 (Kcal)',
-        'drink_price': '價格 (NTD)',
-        'drink_caff': '咖啡因 (mg)',
-        'drink_name': '飲料名稱'
+        'drink_cal': 'Calories (Kcal)',
+        'drink_price': 'Price (NTD)',
+        'drink_caff': 'Caffeine (mg)',
+        'drink_name': 'Drink'
     }
 
     # 3. 畫圖
@@ -419,12 +710,25 @@ def update_graph(selected_metric, sort_order):
         x='drink_name',         
         y=selected_metric,      
         text=selected_metric,   
-        labels=labels_map,      
-        title=f"飲料{labels_map[selected_metric]}排名 ({'最低' if is_ascending else '最高'} 10 名)"
+        labels=labels_map
+        # title=f"飲料{labels_map[selected_metric]}排名 ({'最低' if is_ascending else '最高'} 10 名)"
     )
     
     
-    fig.update_traces(textposition='outside', marker_color=COLOR_DARK_BROWN) # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
+    fig.update_traces(textposition='inside',
+                      marker_color=COLOR_DARK_BROWN,
+                      textfont = dict(size = 6)) # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
+
+    # fig.update_xaxes(tickfont = dict(size = 6), tickangle = 45)
+    fig.update_xaxes(
+        tickmode = 'array',
+        tickvals = top_10_df['drink_name'],
+        title_text = None,
+        tickangle = 45,
+        tickfont = dict(size = 8)
+        # ticktext = [name.replace(' ', '<br>') for name in top_10_df['drink_name']]
+    )
+    fig.update_yaxes(tickfont = dict(size = 10))
 
     fig.update_layout(
         xaxis={'categoryorder':'total ascending'} if is_ascending else {'categoryorder':'total descending'},
@@ -437,7 +741,9 @@ def update_graph(selected_metric, sort_order):
         title_font_color=COLOR_DARK_BROWN,
         # -------------------------
         # margin=dict(l=100, r=100, t=100, b=100) 
-        title_x = 0.5
+        title_x = 0.5,
+        autosize = True,
+        margin = dict(l = 0, r = 0, t = 0, b = 0)
     )
     
     return fig
@@ -550,7 +856,13 @@ def show_drinks(ingr_id):
     df['Caffeine'] = (df['base_caff'] + df['tp_caff']).astype(int)
     
     result = df[['drink_name', 'Price', 'Calories', 'Caffeine']].copy()
-    result.columns = ['Name', 'Price', 'Kcal', 'Caffeine(mg)']
+    result.columns = ['Name', 'Price (NTD)', 'Calories (Kcal)', 'Caffeine (mg)']
+    columns = [
+        {'name': ['Name'], 'id': 'Name'},
+        {'name': ['Price', 'NTD'], 'id': 'Price'},
+        {'name': ['Calories', 'Kcal'], 'id': 'Calories'},
+        {'name': ['Caffeine', 'mg'], 'id': 'Caffeine'},
+    ]
     result = result.drop_duplicates()
     
     # 表格
@@ -560,28 +872,39 @@ def show_drinks(ingr_id):
             columns=[{'name': i, 'id': i} for i in result.columns],
             sort_action='native', # 排序功能
             page_action='native', # 分頁功能
-            page_size=10, # 10筆一頁
+            page_size=7, # 7筆一頁
+            style_table = {
+                'height': '100%',
+                'overflowY': 'auto',
+                'width': '100%',
+                'margin': '0',
+                'padding': '0',
+                'borderSpacing': '0'
+            },
             
             # 表頭
             style_header={
                 'backgroundColor': '#8B6F47', 
                 'color': 'white', 
                 'fontWeight': 'bold',
-                'fontSize': '14px',
+                'fontSize': '12px',
                 'textAlign': 'center',
-                'padding': '12px',
+                'padding': '6px',
                 'border': 'none',  
+                'height': 'auto'
             },
             
             # 儲存格
             style_cell={
                 'textAlign': 'center',
-                'padding': '12px 10px',
+                'padding': '6px 5px',
                 'backgroundColor': 'white',
                 'border': 'none',
                 'borderBottom': '1px solid #E7DABD',
-                'fontSize': '14px',
-                'color': '#333'
+                'fontSize': '12px',
+                'color': '#333',
+                'whiteSpace': 'normal',   # 允許換行
+                'height': 'auto'          # 高度自動調整
             },
             
             # Name 欄靠左
@@ -590,7 +913,7 @@ def show_drinks(ingr_id):
                     'if': {'column_id': 'Name'},
                     'textAlign': 'left',
                     'fontWeight': '500',
-                    'paddingLeft': '15px'
+                    'paddingLeft': '10px'
                 }
             ],
             
@@ -598,20 +921,9 @@ def show_drinks(ingr_id):
             style_data_conditional=[
                 {
                     'if': {'row_index': 'odd'},
-                    'backgroundColor': "#F4F0E9"
+                    'backgroundColor': COLOR_MIDDLE_BROWN
                 }
             ],
-        ),
-        
-        html.Div(
-            '* Calories are calculated based on Less Sugar level.',
-            style={
-                'marginTop': '20px',
-                'fontStyle': 'italic',
-                'color': '#999',
-                'fontSize': '13px',
-                'textAlign': 'center'
-            }
         )
     ])
 
@@ -630,11 +942,11 @@ def show_drinks(ingr_id):
   Input('sw_dd', 'value'),
   Input('base_dd', 'value'),
   Input('tp_dd', 'value'),
-  Input('scatter_plot', 'clickData'),
+  Input('scatter_plot', 'hoverData'),
   State('base_options_store','data'),  # store
   State('tp_options_store','data')  # store
 )
-def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
+def update_scatter(sw, base, tp, hoverData, base_options_data, tp_options_data):
     ctx = callback_context
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -667,7 +979,7 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
         range_y = [28, 82]
     )
     new_fig.update_layout(
-        font = dict(family = 'Arial, sans-serif', size = 16, color = COLOR_DARK_BROWN),
+        font = dict(family = 'Arial, sans-serif', size = 14, color = COLOR_DARK_BROWN),
         plot_bgcolor = COLOR_WHITE,
         xaxis = plot_grid('Calories (Kcal)'),
         yaxis = plot_grid('Price (NTD)'),
@@ -709,8 +1021,8 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
             if current_tp == tp and current_base not in base_options:
                 base_options.append(current_base)
         
-    elif trigger_id == 'scatter_plot' and clickData is not None:  # change price, name, cal, img
-        name = clickData['points'][0]['customdata'][0]
+    elif trigger_id == 'scatter_plot' and hoverData is not None:  # change price, name, cal, img
+        name = hoverData['points'][0]['customdata'][0]
         price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']
         cal = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_cal']
         img = to_pic(name)
@@ -718,6 +1030,31 @@ def update_scatter(sw, base, tp, clickData, base_options_data, tp_options_data):
         base_options = pd.Series(base_list).unique().tolist()
         tp_options = tp_list
     return new_fig, img, price, cal, name, base_options, tp_options, base_options, tp_options
+
+# dashboard 4 callback
+@callback(
+    Output("radar", "figure"),
+    Output("left_img", "src"),
+    Output("left_name", "children"),
+    Output("right_img", "src"),
+    Output("right_name", "children"),
+    Input("left_dd", "value"),
+    Input("right_dd", "value"),
+)
+def update_compare(left_drink, right_drink):
+    fig = radar_fig(left_drink, right_drink)
+
+    left_src = to_pic(left_drink) if left_drink else "/assets/cup.png"
+    right_src = to_pic(right_drink) if right_drink else "/assets/cup.png"
+
+    # 想顯示更清楚：drink_name + (default sweetness)
+    def label(drink):
+        if not drink:
+            return ""
+        sw = plot_df.loc[plot_df["drink_name"] == drink, "sw_name"].iloc[0]
+        return f"{drink} ({sw})"
+
+    return fig, left_src, label(left_drink), right_src, label(right_drink)
 
 if __name__ == '__main__':
     app.run(debug=True)
