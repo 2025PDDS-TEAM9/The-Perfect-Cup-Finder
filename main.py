@@ -61,9 +61,8 @@ COLOR_MIDDLE_BROWN = '#F4F0E9'
 COLOR_DARK_BROWN = '#5C4033'
 COLOR_WHITE = '#FFFFFF'
 COLOR_BLACK = '#000000'
-FONT_FAMILY = 'Arial, sans-serif' #'Consolas, monospace' # 'Inter, Arial, sans-serif'
+FONT_FAMILY = 'Arial, sans-serif'
 BORDER = False
-# BORDER = True
 def pic(name):
     return html.Img(src = f'/assets/{name}.png',
                     id = 'drink_pic',
@@ -83,7 +82,6 @@ def block_style(mode):
     if mode == 'full':
         return {'backgroundColor': COLOR_WHITE,
                 'borderRadius': '20px',
-                # 'padding': '0vw 5vw',  # 3vw
                 'margin': '1vw 5vw 5vw 5vw',
                 'height': '80vh',
                 'width': '80vw',
@@ -91,7 +89,6 @@ def block_style(mode):
     else:  # half
         return {'backgroundColor': COLOR_WHITE,
                 'borderRadius': '20px',
-                # 'padding': '0vw 5vw',  # 3vw
                 'margin': '1vw 2vw 5vw 2vw',
                 'height': '80vh',
                 'width': '40vw',
@@ -111,10 +108,7 @@ def dd_style():
             'fontSize': '1vw',
             'fontWeight': 'normal',  # bold, normal, 100~900
             'textAlign': 'left',
-            # 'border': '1px solid #8B6F47',
             'borderRadius': '4px',
-            # 'width': '60%',
-            # 'boxSizing': 'border-box'
             }
 
 def dd_border(ratio):
@@ -164,7 +158,6 @@ def default_sw(text):
     return html.Div(
                 text,
                 style={
-                    # 'marginTop': '1vh',
                     'fontStyle': 'italic',
                     'color': '#999',
                     'fontSize': '13px',
@@ -331,7 +324,7 @@ bar_dd = dcc.Dropdown(
                     ],
                     value='drink_cal',
                     clearable=False,
-                    style=dd_style() #{'width': '200px'} #, 'marginLeft': '10px'}
+                    style=dd_style()
                 )
 bar_radiobtn = dcc.RadioItems(
                     id='sort-order',
@@ -371,11 +364,6 @@ table_dd = html.Div([
 table = html.Div([            
                 html.Div(id='output')
             ], style={
-                # 'backgroundColor': 'white',
-                # 'padding': '35px',
-                # 'borderRadius': '15px',
-                # 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
-                # 'minHeight': '400px',
                 **add_border(),
                 'height': '54vh',
                 'width': '35vw'
@@ -406,7 +394,6 @@ scatter_fig = px.scatter(
   custom_data = ['drink_full_name'],
   range_x = [0, 850],
   range_y = [20, 85]
-#   title = 'Relationship Between Salary and Certificate Counts'
 )
 scatter_fig.update_layout(
     font = dict(family = 'Arial, sans-serif', size = 14, color = COLOR_DARK_BROWN),
@@ -673,14 +660,6 @@ app.layout = html.Div(children =
                     ], style = put_vertical('center'))
                 ], style = put_vertical('center')))
 
-# # 設定網頁的外觀 (Layout)
-# app.layout = html.Div([
-    
-
-# # 修改最外層背景色
-# ], style={'backgroundColor': '#EBDEC1', 'minHeight': '100vh', 'padding': '20px'})
-
-
 # dashboard 1 callback
 @callback(
     Output('bar-chart', 'figure'),
@@ -711,7 +690,6 @@ def update_graph(selected_metric, sort_order):
         y=selected_metric,      
         text=selected_metric,   
         labels=labels_map
-        # title=f"飲料{labels_map[selected_metric]}排名 ({'最低' if is_ascending else '最高'} 10 名)"
     )
     
     
@@ -719,7 +697,6 @@ def update_graph(selected_metric, sort_order):
                       marker_color=COLOR_DARK_BROWN,
                       textfont = dict(size = 6)) # 我順便把柱子的顏色也改成深咖啡色，看看你喜不喜歡
 
-    # fig.update_xaxes(tickfont = dict(size = 6), tickangle = 45)
     fig.update_xaxes(
         tickmode = 'array',
         tickvals = top_10_df['drink_name'],
@@ -732,15 +709,12 @@ def update_graph(selected_metric, sort_order):
 
     fig.update_layout(
         xaxis={'categoryorder':'total ascending'} if is_ascending else {'categoryorder':'total descending'},
-        # height=600,
         
         # --- 顏色的設定 ---
         plot_bgcolor='white',      
-        # paper_bgcolor='#EBDEC1',    
         font_color=COLOR_DARK_BROWN,       
         title_font_color=COLOR_DARK_BROWN,
         # -------------------------
-        # margin=dict(l=100, r=100, t=100, b=100) 
         title_x = 0.5,
         autosize = True,
         margin = dict(l = 0, r = 0, t = 0, b = 0)
@@ -958,7 +932,7 @@ def update_scatter(sw, base, tp, hoverData, base_options_data, tp_options_data):
     base_options = base_options_data.copy()
     tp_options = tp_options_data.copy()  
 
-    # change data and plot
+    # filter all data
     new_drink_info = drink_info.copy()
     if sw is not None:
         new_drink_info = new_drink_info.loc[new_drink_info['drink_full_name'].str.contains(sw)]
@@ -986,49 +960,65 @@ def update_scatter(sw, base, tp, hoverData, base_options_data, tp_options_data):
         showlegend = False
     )
 
-    # change pic, name, price, cal, options
-    if trigger_id == 'sw_dd' and sw is not None:  # change plot
-        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
-            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
-        elif base is not None:
-            img = to_pic(base)
-        elif tp != 'NULL':
-            img = to_pic(tp)
+    # change options
+    if trigger_id == 'base_dd':
+        if tp is None:
+            base_options = pd.Series(base_list).unique().tolist()
+        if base is not None:
+            tp_options = []
+            for idx, row in drink_info.iterrows():
+                current_tp = find_tp(row['drink_full_name'])
+                current_base = row['drink_base']
+                if current_base == base and current_tp not in tp_options:
+                    tp_options.append(current_tp)
+    elif trigger_id == 'tp_dd':
+        if base is None:
+            tp_options = tp_list
+        if tp is not None:
+            base_options = []
+            for idx, row in drink_info.iterrows():
+                current_tp = find_tp(row['drink_full_name'])
+                current_base = row['drink_base']
+                if current_tp == tp and current_base not in base_options:
+                    base_options.append(current_base)
 
-    elif trigger_id == 'base_dd' and base is not None:  # change data (plot), pic, topping
-        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
-            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
-        else:
-            img = to_pic(base)
-
-        tp_options = []
-        for idx, row in drink_info.iterrows():
-            current_tp = find_tp(row['drink_full_name'])
-            current_base = row['drink_base']
-            if current_base == base and current_tp not in tp_options:
-                tp_options.append(current_tp)
-
-    elif trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
-        if len(new_drink_info['drink_name'].unique().tolist()) == 1:
-            img = to_pic(new_drink_info['drink_name'].unique().tolist()[0])
-        elif tp != 'NULL':
-            img = to_pic(tp)
-
-        base_options = []
-        for idx, row in drink_info.iterrows():
-            current_tp = find_tp(row['drink_full_name'])
-            current_base = row['drink_base']
-            if current_tp == tp and current_base not in base_options:
-                base_options.append(current_base)
+    # change pic, name, price, cal
+    if len(new_drink_info['drink_name'].unique().tolist()) == 1:
+        img = to_pic(new_drink_info.iloc[0]['drink_name'])
+        if len(new_drink_info['drink_full_name'].unique().tolist()) == 1:
+            price = new_drink_info.iloc[0]['drink_price']
+            cal = new_drink_info.iloc[0]['drink_cal']
         
-    elif trigger_id == 'scatter_plot' and hoverData is not None:  # change price, name, cal, img
+    
+
+    elif trigger_id == 'sw_dd' and sw is not None:  # change plot
+        if base is not None:
+            img = to_pic(base)
+        elif tp is not None and tp != 'NULL':
+            img = to_pic(tp)
+    elif trigger_id == 'sw_dd' and sw is None:
+        price = '--'
+        cal = '--'
+    # name = ''
+    elif trigger_id == 'base_dd' and base is not None:  # change data (plot), pic, topping
+        img = to_pic(base)
+    elif trigger_id == 'base_dd' and base is None:
+        if tp is not None and tp != 'NULL':
+            img = to_pic(tp)
+    elif trigger_id == 'tp_dd' and tp is not None:  # change data (plot), pic, base
+        if tp != 'NULL':
+            img = to_pic(tp)
+    elif trigger_id == 'tp_dd' and tp is None:
+        if base is not None:
+            img = to_pic(base)
+        
+    # change pic, name, price, cal through hover data points
+    if trigger_id == 'scatter_plot' and hoverData is not None:  # change price, name, cal, img
         name = hoverData['points'][0]['customdata'][0]
         price = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_price']
         cal = drink_info.loc[drink_info['drink_full_name'] == name, 'drink_cal']
         img = to_pic(name)
-    elif base is None and tp is None:  # clear base and tp
-        base_options = pd.Series(base_list).unique().tolist()
-        tp_options = tp_list
+
     return new_fig, img, price, cal, name, base_options, tp_options, base_options, tp_options
 
 # dashboard 4 callback
@@ -1058,34 +1048,3 @@ def update_compare(left_drink, right_drink):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-# import dash
-# from dash import dcc, html, dash_table, Input, Output
-# import pandas as pd
-# import sqlite3
-
-# # 連接資料庫
-# DB = 'Tea_Shop_Database.db'
-# conn = sqlite3.connect(DB)  
-# conn.close() 
-
-# # Dash 
-# app = dash.Dash(__name__)  
-
-# app.layout = html.Div([
-#     # 外層（米色背景）
-#     html.Div([
-        
-
-#     ], style={
-#         'backgroundColor': "#EBDEC1",
-#         'minHeight': '100vh',
-#         'padding': '40px 20px',
-#     })
-# ])
-
-# # Callback
-
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
